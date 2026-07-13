@@ -1,6 +1,6 @@
 package com.fashion.app.dto.response;
 
-import com.fashion.model.enums.DiscountType;
+import com.fashion.app.model.enums.DiscountType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
