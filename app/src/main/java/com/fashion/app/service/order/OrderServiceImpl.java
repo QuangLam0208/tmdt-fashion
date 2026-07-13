@@ -18,8 +18,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -199,28 +202,199 @@ public class OrderServiceImpl implements OrderService {
         }
     }
 
+    // THEO DÕI TRẠNG THÁI ĐƠN HÀNG - Xem danh sách
+
+    // AC-BE-US28-01: Phát triển phương thức tìm kiếm danh sách lịch sử đơn hàng
     @Override
     @Transactional(readOnly = true)
     public List<OrderSummaryResponseDTO> getCustomerOrderHistory(Long userId) {
-        throw new UnsupportedOperationException("Not implemented yet");
+        // Lấy danh sách tất cả đơn hàng của user, không phân trang, sắp xếp mới nhất lên đầu
+        // Yêu cầu: Cần đảm bảo phương thức findByUserIdOrderByOrderDateDesc đã được khai báo trong OrderRepository
+        List<Order> orders = orderRepository.findByUserIdOrderByOrderDateDesc(userId);
+
+        return orders.stream()
+                .map(this::convertToSummaryDTO)
+                .collect(Collectors.toList());
     }
 
     @Override
     @Transactional(readOnly = true)
     public Page<OrderSummaryResponseDTO> getMyOrders(Long userId, List<OrderStatus> statuses, Pageable pageable) {
-        throw new UnsupportedOperationException("Not implemented yet");
+        Page<Order> orders;
+        if (statuses == null || statuses.isEmpty()) {
+            orders = orderRepository.findAllMyOrders(userId, pageable);
+        } else {
+            orders = orderRepository.searchMyOrdersByStatuses(userId, statuses, pageable);
+        }
+
+        return orders.map(this::convertToSummaryDTO);
+    }
+
+    private OrderSummaryResponseDTO convertToSummaryDTO(Order order) {
+        // Tổng hợp trạng thái từ các OrderItem
+        Map<String, Integer> statusSummary = order.getOrderItems().stream()
+                .collect(Collectors.groupingBy(
+                        item -> item.getStatus().name(),
+                        LinkedHashMap::new,
+                        Collectors.summingInt(i -> 1)));
+
+        List<OrderItemPreviewDTO> itemPreviews = order.getOrderItems().stream()
+                .map(item -> OrderItemPreviewDTO.builder()
+                        .productName(item.getProductName())
+                        .productImage(getProductImageUrl(item.getProductVariant()))
+                        .quantity(item.getQuantity())
+                        .build())
+                .collect(Collectors.toList());
+
+        return OrderSummaryResponseDTO.builder()
+                .orderId(order.getId())
+                .orderDate(order.getOrderDate())
+                .totalAmount(order.getTotalAmount())
+                .paymentMethod(order.getPaymentMethod())
+                .status(order.getStatus())
+                .itemCount(order.getOrderItems().size())
+                .statusSummary(statusSummary)
+                .items(itemPreviews)
+                .build();
     }
 
     @Override
     @Transactional(readOnly = true)
     public Page<OrderItemSummaryDTO> getMyOrderItems(Long userId, List<OrderStatus> statuses, Boolean reviewed, Pageable pageable) {
-        throw new UnsupportedOperationException("Not implemented yet");
+        Page<OrderItem> items;
+
+        if (Boolean.TRUE.equals(reviewed)) {
+            // Trường hợp: Lấy Lịch sử Review (Tất cả sản phẩm đã được đánh giá thành công)
+            items = orderItemRepository.findByOrderUserIdAndIsReviewedTrueOrderByOrderOrderDateDesc(userId, pageable);
+        } else if (Boolean.FALSE.equals(reviewed)) {
+            // Trường hợp: Lấy sản phẩm chờ đánh giá (Lọc theo isReviewed = false)
+            items = orderItemRepository.findByOrderUserIdAndStatusInAndIsReviewedOrderByOrderOrderDateDesc(userId,
+                    statuses, false, pageable);
+        } else {
+            // Trường hợp: Các tab khác (shipped, processing, etc. - không lọc isReviewed)
+            // Nếu statuses chỉ chứa DELIVERED hoặc COMPLETED (Tab Đánh giá mặc định), chỉ lấy sản phẩm chưa đánh giá
+            boolean isReviewTab = statuses != null
+                    && (statuses.contains(OrderStatus.DELIVERED) || statuses.contains(OrderStatus.COMPLETED))
+                    && statuses.size() <= 2;
+
+            if (isReviewTab) {
+                items = orderItemRepository.findByOrderUserIdAndStatusInAndIsReviewedOrderByOrderOrderDateDesc(userId,
+                        statuses, false, pageable);
+            } else {
+                items = orderItemRepository.findByOrderUserIdAndStatusInOrderByOrderOrderDateDesc(userId, statuses,
+                        pageable);
+            }
+        }
+
+        return items.map(item -> OrderItemSummaryDTO.builder()
+                .orderItemId(item.getId())
+                .orderId(item.getOrder().getId())
+                .productId(item.getProductVariant() != null ? item.getProductVariant().getProduct().getId() : null)
+                .orderDate(item.getOrder().getOrderDate())
+                .paymentMethod(item.getOrder().getPaymentMethod())
+                .productName(item.getProductName())
+                .productImage(getProductImageUrl(item.getProductVariant()))
+                .size(item.getProductVariant() != null ? item.getProductVariant().getSize() : null)
+                .color(item.getProductVariant() != null ? item.getProductVariant().getColor() : null)
+                .quantity(item.getQuantity())
+                .price(item.getPrice() != null ? item.getPrice()
+                        : (item.getProductVariant() != null ? item.getProductVariant().getPrice() : 0.0))
+                .itemTotalAmount(item.getQuantity() * (item.getPrice() != null ? item.getPrice()
+                        : (item.getProductVariant() != null ? item.getProductVariant().getPrice() : 0.0)))
+                .orderTotalAmount(item.getOrder().getTotalAmount())
+                .status(item.getStatus())
+                .refundStatus(item.getRefundStatus())
+                .cancellationReason(item.getCancellationReason())
+                .isReviewed(item.isReviewed())
+                .build());
     }
 
+    // THEO DÕI TRẠNG THÁI ĐƠN HÀNG - Xem chi tiết
     @Override
     @Transactional(readOnly = true)
     public OrderDetailResponseDTO getMyOrderDetail(Long userId, Long orderId) {
-        throw new UnsupportedOperationException("Not implemented yet");
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Đơn hàng không tồn tại!"));
+
+        // AC-BE-US28-02: Kiểm tra quyền sở hữu, nếu không thuộc về User hiện tại thì ném lỗi AccessDeniedException (403 Forbidden)
+        if (!order.getUser().getId().equals(userId)) {
+            throw new AccessDeniedException("Truy cập bị từ chối: Đơn hàng này không thuộc quyền sở hữu của bạn!");
+        }
+
+        List<OrderDetailResponseDTO.OrderItemDTO> itemDTOs = order.getOrderItems().stream()
+                .map(item -> {
+                    List<OrderDetailResponseDTO.OrderHistoryDTO> historyDTOs = item.getOrderHistories().stream()
+                            .map(h -> OrderDetailResponseDTO.OrderHistoryDTO.builder()
+                                    .previousStatus(h.getPreviousStatus())
+                                    .newStatus(h.getNewStatus())
+                                    .changeDate(h.getChangeDate().toInstant())
+                                    .build())
+                            .toList();
+
+                    return OrderDetailResponseDTO.OrderItemDTO.builder()
+                            .orderItemId(item.getId())
+                            .productId(item.getProductVariant() != null ? item.getProductVariant().getProduct().getId() : null)
+                            .productName(item.getProductName())
+                            .productImage(getProductImageUrl(item.getProductVariant()))
+                            .size(item.getProductVariant() != null ? item.getProductVariant().getSize() : null)
+                            .color(item.getProductVariant() != null ? item.getProductVariant().getColor() : null)
+                            .quantity(item.getQuantity())
+                            .price(item.getPrice() != null ? item.getPrice() : (item.getProductVariant() != null ? item.getProductVariant().getPrice() : 0.0))
+                            .status(item.getStatus())
+                            .refundStatus(item.getRefundStatus())
+                            .cancellationReason(item.getCancellationReason())
+                            .isReviewed(item.isReviewed())
+                            .histories(historyDTOs)
+                            .build();
+                })
+                .toList();
+
+        double subtotal = 0.0;
+        for (OrderDetailResponseDTO.OrderItemDTO item : itemDTOs) {
+            subtotal += item.getPrice() * item.getQuantity();
+        }
+
+        return OrderDetailResponseDTO.builder()
+                .orderId(order.getId())
+                .orderDate(order.getOrderDate())
+                .totalAmount(order.getTotalAmount())
+                .status(order.getStatus())
+                .paymentMethod(order.getPaymentMethod())
+                .shippingAddress(order.getShippingAddress())
+                .subtotalAmount(subtotal)
+                .discountAmount(subtotal - order.getTotalAmount())
+                .couponCode(order.getCoupon() != null ? order.getCoupon().getCode() : null)
+                .discountValue(order.getCoupon() != null ? order.getCoupon().getDiscountValue() : null)
+                .discountType(order.getCoupon() != null ? order.getCoupon().getDiscountType() : null)
+                .items(itemDTOs)
+                .build();
+    }
+
+    /**
+     * Helper to get the correct product image URL (Absolute path)
+     */
+    private String getProductImageUrl(ProductVariant variant) {
+        if (variant == null || variant.getProduct() == null || variant.getProduct().getImages() == null
+                || variant.getProduct().getImages().isEmpty()) {
+            return null;
+        }
+
+        // Ưu tiên lấy hình ảnh khớp màu sắc với Variant
+        String targetUrl = variant.getProduct().getImages().stream()
+                .filter(img -> img.getColor() != null && img.getColor().equalsIgnoreCase(variant.getColor()))
+                .map(ProductImage::getUrl)
+                .findFirst()
+                .orElse(variant.getProduct().getImages().get(0).getUrl());
+
+        if (targetUrl == null)
+            return null;
+
+        // Đảm bảo đường dẫn tuyệt đối (bắt đầu bằng /)
+        if (!targetUrl.startsWith("/") && !targetUrl.startsWith("http")) {
+            targetUrl = "/" + targetUrl;
+        }
+
+        return targetUrl;
     }
 
     @Override
@@ -323,6 +497,52 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional(readOnly = true)
     public OrderDashboardSummaryDTO getDashboardSummary(Long userId) {
-        throw new UnsupportedOperationException("Not implemented yet");
+        List<Object[]> statusCounts = orderRepository.countMyOrdersByItemStatus(userId);
+
+        long unpaid = 0;
+        long processing = 0;
+        long shipped = 0;
+        long returns = 0;
+
+        for (Object[] row : statusCounts) {
+            OrderStatus status = (OrderStatus) row[0];
+            long count = (long) row[1];
+
+            switch (status) {
+                case PENDING_PAYMENT:
+                    unpaid += count;
+                    break;
+                case PENDING_CONFIRMATION:
+                case PAID:
+                case PROCESSING:
+                    processing += count;
+                    break;
+                case SHIPPING:
+                    shipped += count;
+                    break;
+                case CANCELLED:
+                    // Trong hệ thống này, Return được gộp chung hoặc xử lý qua RefundStatus,
+                    // tạm thời gộp Cancelled vào Returns nếu có RefundStatus hoặc đơn giản là
+                    // Cancelled
+                    returns += count;
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        long toReviewCount = orderRepository.countUnreviewedItems(userId);
+        OrderSummaryResponseDTO latestOrder = orderRepository.findTopByUserIdOrderByOrderDateDesc(userId)
+                .map(this::convertToSummaryDTO)
+                .orElse(null);
+
+        return OrderDashboardSummaryDTO.builder()
+                .unpaidCount(unpaid)
+                .processingCount(processing)
+                .shippedCount(shipped)
+                .toReviewCount(toReviewCount)
+                .returnCount(returns)
+                .latestOrder(latestOrder)
+                .build();
     }
 }
