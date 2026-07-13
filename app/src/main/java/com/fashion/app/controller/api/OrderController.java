@@ -1,5 +1,6 @@
 package com.fashion.app.controller.api;
 
+import com.fashion.app.dto.request.CancelOrderRequestDTO;
 import com.fashion.app.dto.request.PlaceOrderRequestDTO;
 import com.fashion.app.dto.response.*;
 import com.fashion.app.service.order.OrderService;
@@ -25,5 +26,15 @@ public class OrderController {
         dto.setUserId(SecurityUtils.getAuthenticatedUserId());
         PlaceOrderResponseDTO response = orderService.placeOrder(dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    // HỦY ĐƠN HÀNG
+    @PostMapping("/{orderId}/cancel")
+    public ResponseEntity<MessageResponseDTO> cancelOrder(
+            @PathVariable Long orderId,
+            @Valid @RequestBody CancelOrderRequestDTO dto) {
+        Long userId = SecurityUtils.getAuthenticatedUserId();
+        MessageResponseDTO response = orderService.cancelOrder(userId, orderId, dto);
+        return ResponseEntity.ok(response);
     }
 }

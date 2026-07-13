@@ -13,11 +13,13 @@ import com.fashion.app.service.payment.MomoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -224,7 +226,92 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public MessageResponseDTO cancelOrder(Long userId, Long orderId, CancelOrderRequestDTO dto) {
-        throw new UnsupportedOperationException("Not implemented yet");
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Đơn hàng không tồn tại!"));
+
+        // 1. Kiểm tra quyền sở hữu
+        if (!order.getUser().getId().equals(userId)) {
+            throw new AccessDeniedException("Bạn không có quyền hủy đơn hàng này!");
+        }
+
+        Set<OrderStatus> cancellableStatuses = Set.of(
+                OrderStatus.PENDING_PAYMENT,
+                OrderStatus.PENDING_CONFIRMATION,
+                OrderStatus.PAID,
+                OrderStatus.PROCESSING);
+
+        // 2. Kiểm tra trạng thái đơn hàng
+        if (!cancellableStatuses.contains(order.getStatus())) {
+            throw new BadRequestException("Đơn hàng đang ở trạng thái " + order.getStatus() + ", không thể hủy!");
+        }
+
+        boolean hasRefund = false;
+        boolean refundFailed = false;
+
+        // 3. Cập nhật trạng thái Order chính thành CANCELLED
+        order.setStatus(OrderStatus.CANCELLED);
+        orderRepository.save(order);
+
+        // 4. Xử lý từng OrderItem
+        for (OrderItem item : order.getOrderItems()) {
+            OrderStatus previousStatus = item.getStatus();
+
+            // Nếu item đã thanh toán online → cần hoàn tiền
+            if (previousStatus == OrderStatus.PAID && order.getPaymentMethod() != PaymentMethod.COD) {
+                try {
+                    item.setRefundStatus(RefundStatus.PENDING);
+                    hasRefund = true;
+                } catch (Exception e) {
+                    item.setRefundStatus(RefundStatus.FAILED);
+                    refundFailed = true;
+                }
+            }
+
+            item.setStatus(OrderStatus.CANCELLED);
+            item.setCancellationReason(dto.getCancellationReason());
+            orderItemRepository.save(item);
+
+            // Lưu lịch sử
+            OrderHistory history = OrderHistory.builder()
+                    .orderItem(item)
+                    .previousStatus(previousStatus)
+                    .newStatus(OrderStatus.CANCELLED)
+                    .changeDate(new Date())
+                    .build();
+            orderHistoryRepository.save(history);
+
+            // 5. Hoàn lại tồn kho và cập nhật Product cha
+            if (item.getProductVariant() != null) {
+                ProductVariant variant = item.getProductVariant();
+                variant.setStockQuantity(variant.getStockQuantity() + item.getQuantity().intValue());
+                productVariantRepository.save(variant);
+
+                Product parentProduct = variant.getProduct();
+                if (parentProduct != null && parentProduct.getStatus() == ProductStatus.OUT_OF_STOCK) {
+                    parentProduct.setStatus(ProductStatus.ACTIVE);
+                }
+            }
+        }
+
+        String message = "Hủy đơn hàng thành công!";
+
+        // Gửi thông báo
+        notificationService.createNotification(
+                order.getUser().getId(),
+                "Đơn hàng đã được hủy",
+                "Đơn hàng #" + order.getId() + " đã được hủy thành công. Lý do: " + dto.getCancellationReason(),
+                "WARNING",
+                order.getId());
+
+        if (hasRefund && !refundFailed) {
+            message += " Yêu cầu hoàn tiền đang được xử lý.";
+        } else if (refundFailed) {
+            message += " Lỗi khi hoàn tiền một số sản phẩm, vui lòng liên hệ hỗ trợ.";
+        }
+
+        return MessageResponseDTO.builder()
+                .message(message)
+                .build();
     }
 
     @Override
