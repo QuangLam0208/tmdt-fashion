@@ -17,6 +17,8 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -491,7 +493,26 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public String retryPayment(Long userId, Long orderId) {
-        throw new UnsupportedOperationException("Not implemented yet");
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Đơn hàng không tồn tại!"));
+
+        // Bảo mật: Kiểm tra đơn hàng có thuộc về User này không
+        if (!order.getUser().getId().equals(userId)) {
+            throw new AccessDeniedException("Bạn không có quyền thanh toán đơn hàng này!");
+        }
+
+        // Kiểm tra xem đơn hàng còn trong trạng thái PENDING_PAYMENT không
+        if (order.getStatus() != OrderStatus.PENDING_PAYMENT) {
+            throw new BadRequestException("Đơn hàng này không ở trạng thái chờ thanh toán!");
+        }
+
+        // Kiểm tra hết hạn (10 phút)
+        long minutesElapsed = Duration.between(order.getOrderDate(), Instant.now()).toMinutes();
+        if (minutesElapsed > 10) {
+            throw new BadRequestException("Yêu cầu thanh toán đã hết hạn (quá 10 phút)!");
+        }
+
+        return momoService.createPaymentUrl(order.getId(), order.getTotalAmount());
     }
 
     @Override

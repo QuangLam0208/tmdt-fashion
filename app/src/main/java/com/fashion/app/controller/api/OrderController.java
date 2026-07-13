@@ -76,6 +76,15 @@ public class OrderController {
         return ResponseEntity.ok(orderDetail);
     }
 
+    // THANH TOÁN LẠI (Cho đơn hàng MoMo chưa quá hạn)
+    @PostMapping("/{orderId}/retry-payment")
+    public ResponseEntity<MessageResponseDTO> retryPayment(@PathVariable Long orderId) {
+        Long userId = SecurityUtils.getAuthenticatedUserId();
+        String paymentUrl = orderService.retryPayment(userId, orderId);
+        return ResponseEntity.ok(new MessageResponseDTO(paymentUrl));
+    }
+
+
     // DASHBOARD SUMMARY
     @GetMapping("/dashboard-summary")
     public ResponseEntity<OrderDashboardSummaryDTO> getDashboardSummary() {
