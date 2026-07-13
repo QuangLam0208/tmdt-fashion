@@ -31,13 +31,33 @@ public class PaymentServiceImpl implements PaymentService {
     @Override
     @Transactional
     public void processMomoIPN(Map<String, Object> payload) {
-        throw new UnsupportedOperationException("Not implemented yet");
+        Map<String, String> stringParams = new java.util.HashMap<>();
+        payload.forEach((k, v) -> stringParams.put(k, String.valueOf(v)));
+
+        if (!momoService.verifySignature(stringParams)) {
+            throw new RuntimeException("Chữ ký MoMo không hợp lệ!");
+        }
+
+        int resultCode = Integer.parseInt(stringParams.get("resultCode"));
+        Long orderId = Long.parseLong(stringParams.get("orderId"));
+
+        updateOrderPayStatus(orderId, resultCode == 0);
     }
 
     @Override
     @Transactional
     public String processMomoReturn(Map<String, String> allParams) {
-        throw new UnsupportedOperationException("Not implemented yet");
+        if (!momoService.verifySignature(allParams)) {
+            return "failed";
+        }
+
+        String resultCode = allParams.get("resultCode");
+        Long orderId = Long.parseLong(allParams.get("orderId"));
+
+        boolean success = "0".equals(resultCode);
+        updateOrderPayStatus(orderId, success);
+
+        return success ? "success" : "failed";
     }
 
     private void updateOrderPayStatus(Long orderId, boolean success) {
