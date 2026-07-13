@@ -1,0 +1,37 @@
+package com.fashion.app.controller.api.admin;
+
+import com.fashion.app.dto.request.CategoryRequestDTO;
+import com.fashion.app.dto.response.CategoryResponseDTO;
+import com.fashion.app.service.category.CategoryService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/admin/categories")
+@RequiredArgsConstructor
+public class AdminCategoryController {
+
+    private final CategoryService categoryService;
+
+    @PostMapping("/create")
+    public ResponseEntity<CategoryResponseDTO> createCategory(
+            @Valid @RequestBody CategoryRequestDTO request) {
+        return new ResponseEntity<>(categoryService.createCategory(request), HttpStatus.CREATED);
+    }
+
+    @PutMapping("/update/{id}")
+    public ResponseEntity<CategoryResponseDTO> updateCategory(
+            @PathVariable Long id,
+            @Valid @RequestBody CategoryRequestDTO request) {
+        return ResponseEntity.ok(categoryService.updateCategory(id, request));
+    }
+
+    @DeleteMapping("/delete/{id}")
+    public ResponseEntity<String> deleteCategory(@PathVariable Long id) {
+        categoryService.deleteCategory(id);
+        return ResponseEntity.ok("Xóa danh mục thành công!");
+    }
+}
