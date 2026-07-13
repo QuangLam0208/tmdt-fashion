@@ -1,6 +1,6 @@
 package com.fashion.app.dto.response;
 
-import com.fashion.model.enums.ProductStatus;
+import com.fashion.app.model.enums.ProductStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

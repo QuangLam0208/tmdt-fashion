@@ -1,6 +1,6 @@
 package com.fashion.app.dto.request;
 
-import com.fashion.model.enums.ProductStatus;
+import com.fashion.app.model.enums.ProductStatus;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
