@@ -1,0 +1,18 @@
+package com.fashion.app.repository;
+
+import com.fashion.app.model.Address;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface AddressRepository extends JpaRepository<Address, Long> {
+
+    // Lấy toàn bộ địa chỉ của một khách hàng
+    List<Address> findByUserId(Long userId);
+
+    // Lấy địa chỉ mặc định của một khách hàng
+    Optional<Address> findByIdAndUserId(Long addressId, Long userId);
+}
