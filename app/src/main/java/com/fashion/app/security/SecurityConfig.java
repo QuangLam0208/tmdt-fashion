@@ -52,7 +52,7 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
 
                 .headers(headers -> headers
-                        .xssProtection(xss -> xss.headerValue(org.springframework.security.web.header.writers.XXssConfig.HeaderValue.ENABLED_MODE_BLOCK))
+                        .xssProtection(xss -> xss.headerValue(org.springframework.security.web.header.writers.XXssProtectionHeaderWriter.HeaderValue.ENABLED_MODE_BLOCK))
                         .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self'; script-src 'self'; object-src 'none';"))
                 )
 
