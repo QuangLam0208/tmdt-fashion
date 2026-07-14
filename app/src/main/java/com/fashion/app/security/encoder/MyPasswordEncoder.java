@@ -1,4 +1,6 @@
 package com.fashion.app.security.encoder;
 
-public class MyPasswordEncoder {
+public interface MyPasswordEncoder {
+    String encode(CharSequence rawPassword);
+    boolean matches(CharSequence rawPassword, String encodedPassword);
 }
