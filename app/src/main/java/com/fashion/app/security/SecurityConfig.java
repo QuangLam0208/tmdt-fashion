@@ -51,6 +51,11 @@ public class SecurityConfig {
                 // Tắt CSRF vì dùng JWT (stateless, không cần CSRF token)
                 .csrf(AbstractHttpConfigurer::disable)
 
+                .headers(headers -> headers
+                        .xssProtection(xss -> xss.headerValue(org.springframework.security.web.header.writers.XXssConfig.HeaderValue.ENABLED_MODE_BLOCK))
+                        .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self'; script-src 'self'; object-src 'none';"))
+                )
+
                 // Cấu hình CORS cho phép frontend gọi API
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
 
