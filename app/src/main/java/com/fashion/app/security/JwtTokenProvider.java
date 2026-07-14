@@ -1,5 +1,6 @@
 package com.fashion.app.security;
 
+import com.fashion.app.model.User;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
@@ -46,8 +47,8 @@ public class JwtTokenProvider {
         Map<String, Object> extraClaims = new HashMap<>();
 
         // Ép kiểu UserDetails về User của bạn để lấy ID
-        if (userDetails instanceof com.fashion.model.User) {
-            extraClaims.put("userId", ((com.fashion.model.User) userDetails).getId());
+        if (userDetails instanceof User) {
+            extraClaims.put("userId", ((User) userDetails).getId());
         }
 
         // Lưu role vào claim
