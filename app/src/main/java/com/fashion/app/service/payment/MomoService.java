@@ -1,80 +1,180 @@
 package com.fashion.app.service.payment;
 
 import com.fashion.app.config.MomoConfig;
+import com.fashion.app.exception.BadRequestException;
+import com.fashion.app.exception.ResourceNotFoundException;
+import com.fashion.app.model.Order;
+import com.fashion.app.model.PaymentTransaction;
+import com.fashion.app.model.enums.PaymentProvider;
+import com.fashion.app.model.enums.PaymentTransactionStatus;
+import com.fashion.app.repository.OrderRepository;
+import com.fashion.app.repository.PaymentTransactionRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClient;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class MomoService {
 
     private final MomoConfig momoConfig;
+    private final OrderRepository orderRepository;
+    private final PaymentTransactionRepository paymentTransactionRepository;
+    private final RestClient restClient = RestClient.create();
 
-    /**
-     * Tạo URL thanh toán MoMo
-     */
-    public String createPaymentUrl(Long orderId, Double amount) {
-        // [MOCK PAYMENT] Thay vì gọi API của MoMo (đang bị lỗi môi trường 11007),
-        // Ta chuyển hướng người dùng đến trang Mock giao diện quét QR cục bộ.
-        return "/mock/momo-payment?orderId=" + orderId + "&amount=" + amount.longValue();
+    public record MomoQueryResult(int resultCode, String transId, String message, String rawResponse) {
+        public boolean isSuccess() {
+            return resultCode == 0;
+        }
     }
 
     /**
-     * Tạo URL Return giả lập (Mock) với chữ ký hợp lệ 100%
-     * Được dùng bởi trang Mock MoMo khi người dùng bấm "Đã quét mã".
+     * Gọi API "create" thật của MoMo (captureWallet) để lấy payUrl cho người dùng quét/redirect thanh toán.
+     * Mỗi lần gọi sẽ tạo 1 requestId mới và lưu lại 1 PaymentTransaction (PENDING) để sau này đối soát (queryTransaction)
+     * hoặc khớp với IPN/return trả về.
      */
-    public String generateMockReturnUrl(String orderId, String amount) {
+    public String createPaymentUrl(Long orderId, Double amount) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Đơn hàng không tồn tại!"));
+
         String accessKey = momoConfig.getAccessKey().trim();
         String partnerCode = momoConfig.getPartnerCode().trim();
         String secretKey = momoConfig.getSecretKey().trim();
-        String returnUrl = momoConfig.getReturnUrl().trim();
 
-        String extraData = "";
-        String message = "Thanh toan thanh cong";
+        String requestId = UUID.randomUUID().toString();
+        String orderIdStr = String.valueOf(orderId);
         String orderInfo = "Thanh toan don hang " + orderId;
-        String orderType = "momo_wallet";
-        String requestId = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
-        String responseTime = String.valueOf(System.currentTimeMillis());
-        String resultCode = "0"; // 0 = Thành công
-        String transId = String.valueOf(System.currentTimeMillis() * 2);
+        String requestType = "captureWallet";
+        String extraData = "";
+        long amountValue = amount.longValue();
 
-        // Chuỗi dữ liệu để Verify (alphabet của key)
         String rawSignature = "accessKey=" + accessKey +
-                "&amount=" + amount +
+                "&amount=" + amountValue +
                 "&extraData=" + extraData +
-                "&message=" + message +
-                "&orderId=" + orderId +
+                "&ipnUrl=" + momoConfig.getNotifyUrl() +
+                "&orderId=" + orderIdStr +
                 "&orderInfo=" + orderInfo +
-                "&orderType=" + orderType +
                 "&partnerCode=" + partnerCode +
+                "&redirectUrl=" + momoConfig.getReturnUrl() +
                 "&requestId=" + requestId +
-                "&responseTime=" + responseTime +
-                "&resultCode=" + resultCode +
-                "&transId=" + transId;
+                "&requestType=" + requestType;
 
         String signature = hmacSha256(rawSignature, secretKey);
 
-        return returnUrl +
-                "?partnerCode=" + partnerCode +
-                "&accessKey=" + accessKey +
-                "&orderId=" + orderId +
-                "&requestId=" + requestId +
-                "&amount=" + amount +
-                "&orderInfo=" + orderInfo +
-                "&orderType=" + orderType +
-                "&transId=" + transId +
-                "&resultCode=" + resultCode +
-                "&message=" + message +
-                "&payType=qr" +
-                "&responseTime=" + responseTime +
-                "&extraData=" + extraData +
-                "&signature=" + signature;
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("partnerCode", partnerCode);
+        body.put("accessKey", accessKey);
+        body.put("requestId", requestId);
+        body.put("amount", amountValue);
+        body.put("orderId", orderIdStr);
+        body.put("orderInfo", orderInfo);
+        body.put("redirectUrl", momoConfig.getReturnUrl());
+        body.put("ipnUrl", momoConfig.getNotifyUrl());
+        body.put("extraData", extraData);
+        body.put("requestType", requestType);
+        body.put("signature", signature);
+        body.put("lang", "vi");
+
+        String rawResponse;
+        int resultCode = -1;
+        String payUrl = null;
+        String message;
+        try {
+            Map<?, ?> response = restClient.post()
+                    .uri(momoConfig.getApiUrl())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(body)
+                    .retrieve()
+                    .body(Map.class);
+
+            rawResponse = String.valueOf(response);
+            if (response != null && response.get("resultCode") != null) {
+                resultCode = ((Number) response.get("resultCode")).intValue();
+            }
+            payUrl = response != null ? (String) response.get("payUrl") : null;
+            message = response != null ? String.valueOf(response.get("message")) : "Không nhận được phản hồi từ MoMo";
+        } catch (Exception e) {
+            log.error("Lỗi khi gọi API tạo giao dịch MoMo cho đơn #{}: {}", orderId, e.getMessage(), e);
+            rawResponse = "ERROR: " + e.getMessage();
+            message = "Không thể kết nối đến MoMo: " + e.getMessage();
+        }
+
+        boolean success = resultCode == 0 && payUrl != null;
+
+        paymentTransactionRepository.save(PaymentTransaction.builder()
+                .order(order)
+                .provider(PaymentProvider.MOMO)
+                .requestId(requestId)
+                .amount(amount)
+                .status(success ? PaymentTransactionStatus.PENDING : PaymentTransactionStatus.FAILED)
+                .rawResponsePayload(rawResponse)
+                .createdAt(Instant.now())
+                .build());
+
+        if (!success) {
+            throw new BadRequestException("Không thể tạo giao dịch thanh toán MoMo: " + message);
+        }
+
+        return payUrl;
+    }
+
+    /**
+     * Chủ động tra cứu trạng thái giao dịch thật với MoMo (endpoint "query"), dùng để đối soát
+     * khi IPN có thể đã bị mất/timeout (case tiền đã trừ nhưng mất kết nối).
+     * Tra cứu dựa trên requestId của lần tạo giao dịch (PENDING) gần nhất của đơn hàng.
+     */
+    public MomoQueryResult queryTransaction(Long orderId, String requestId) {
+        String accessKey = momoConfig.getAccessKey().trim();
+        String partnerCode = momoConfig.getPartnerCode().trim();
+        String secretKey = momoConfig.getSecretKey().trim();
+        String orderIdStr = String.valueOf(orderId);
+
+        String rawSignature = "accessKey=" + accessKey +
+                "&orderId=" + orderIdStr +
+                "&partnerCode=" + partnerCode +
+                "&requestId=" + requestId;
+
+        String signature = hmacSha256(rawSignature, secretKey);
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("partnerCode", partnerCode);
+        body.put("accessKey", accessKey);
+        body.put("requestId", requestId);
+        body.put("orderId", orderIdStr);
+        body.put("signature", signature);
+        body.put("lang", "vi");
+
+        try {
+            Map<?, ?> response = restClient.post()
+                    .uri(momoConfig.getQueryUrl())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(body)
+                    .retrieve()
+                    .body(Map.class);
+
+            String rawResponse = String.valueOf(response);
+            int resultCode = response != null && response.get("resultCode") != null
+                    ? ((Number) response.get("resultCode")).intValue() : -1;
+            String transId = response != null && response.get("transId") != null
+                    ? String.valueOf(response.get("transId")) : null;
+            String message = response != null ? String.valueOf(response.get("message")) : "Không nhận được phản hồi từ MoMo";
+
+            return new MomoQueryResult(resultCode, transId, message, rawResponse);
+        } catch (Exception e) {
+            log.error("Lỗi khi tra cứu giao dịch MoMo cho đơn #{}: {}", orderId, e.getMessage(), e);
+            return new MomoQueryResult(-1, null, "Không thể kết nối đến MoMo: " + e.getMessage(), "ERROR: " + e.getMessage());
+        }
     }
 
     /**
@@ -100,9 +200,12 @@ public class MomoService {
                 "&transId=" + allParams.get("transId");
 
         String recalculatingSecretKey = momoConfig.getSecretKey().trim();
-        System.out.println("MoMo Raw Signature (Verify): " + rawSignature);
         String recalculatedSignature = hmacSha256(rawSignature, recalculatingSecretKey);
-        return recalculatedSignature.equalsIgnoreCase(signature);
+        boolean valid = recalculatedSignature.equalsIgnoreCase(signature);
+        if (!valid) {
+            log.warn("Chữ ký MoMo không khớp cho orderId={}, requestId={}", allParams.get("orderId"), allParams.get("requestId"));
+        }
+        return valid;
     }
 
     /**
