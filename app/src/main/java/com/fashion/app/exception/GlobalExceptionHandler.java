@@ -1,6 +1,6 @@
 package com.fashion.app.exception;
 
-import com.fashion.dto.response.MessageResponseDTO;
+import com.fashion.app.dto.response.MessageResponseDTO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

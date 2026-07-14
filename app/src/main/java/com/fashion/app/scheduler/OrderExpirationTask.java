@@ -12,6 +12,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Date;
 import java.util.List;
 
@@ -30,7 +32,7 @@ public class OrderExpirationTask {
     @Scheduled(fixedRate = 60000)
     @Transactional
     public void cleanupExpiredOrders() {
-        Date tenMinutesAgo = new Date(System.currentTimeMillis() - 10 * 60 * 1000);
+        Instant tenMinutesAgo = Instant.now().minus(Duration.ofMinutes(10));
         List<Order> expiredOrders = orderRepository.findByStatusAndOrderDateBefore(OrderStatus.PENDING_PAYMENT, tenMinutesAgo);
 
         if (expiredOrders.isEmpty()) {

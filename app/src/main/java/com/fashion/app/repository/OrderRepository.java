@@ -62,7 +62,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     Page<Order> findAllMyOrders(@Param("userId") Long userId, Pageable pageable);
 
     // Tìm đơn hàng quá hạn thanh toán
-    List<Order> findByStatusAndOrderDateBefore(OrderStatus status, Date expireTime);
+    List<Order> findByStatusAndOrderDateBefore(OrderStatus status, Instant expireTime);
 
     // DASHBOARD
     // 5 đơn hàng mới nhất
