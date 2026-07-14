@@ -1,4 +1,4 @@
-package com.fashion.security;
+package com.fashion.app.security;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;

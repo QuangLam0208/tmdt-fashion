@@ -1,4 +1,4 @@
-package com.fashion.security;
+package com.fashion.app.security;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
