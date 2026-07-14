@@ -1,0 +1,31 @@
+package com.fashion.app.service.order;
+
+import com.fashion.app.dto.response.MessageResponseDTO;
+import com.fashion.app.dto.response.OrderDetailResponseDTO;
+import com.fashion.app.dto.response.OrderSummaryResponseDTO;
+import com.fashion.app.model.Order;
+import com.fashion.app.model.enums.OrderStatus;
+import com.fashion.app.model.enums.RefundStatus;
+import com.fashion.app.model.enums.ReturnStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
+import java.util.Date;
+
+public interface OrderManagementService {
+
+    // Cập nhật trạng thái của một sản phẩm trong đơn hàng (dành cho Admin)
+    void updateOrderItemStatus(Long orderItemId, OrderStatus newStatus);
+
+    Page<OrderSummaryResponseDTO> getAllOrders(OrderStatus status, Date startDate, Date endDate, Pageable pageable);
+
+    OrderDetailResponseDTO getOrderDetail(Long orderId);
+
+    MessageResponseDTO updateOrderStatus(Long orderId, OrderStatus status);
+
+    void updateRefundStatus(Long orderItemId, RefundStatus status);
+
+    void updateOverallOrderStatus(Order order);
+
+    byte[] generatePdfInvoice(Long orderId);
+}

@@ -1,0 +1,160 @@
+package com.fashion.app.service.cart_item;
+
+import com.fashion.app.dto.request.AddToCartRequestDTO;
+import com.fashion.app.dto.request.UpdateCartItemRequestDTO;
+import com.fashion.app.dto.response.CartItemResponseDTO;
+import com.fashion.app.dto.response.CartResponseDTO;
+import com.fashion.app.dto.response.MessageResponseDTO;
+import com.fashion.app.exception.BadRequestException;
+import com.fashion.app.exception.ResourceNotFoundException;
+import com.fashion.app.model.*;
+import com.fashion.app.repository.CartItemRepository;
+import com.fashion.app.repository.ProductVariantRepository;
+import com.fashion.app.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.Optional;
+
+@Service
+@RequiredArgsConstructor
+public class CartServiceImpl implements CartService {
+    private final CartItemRepository cartItemRepository;
+    private final ProductVariantRepository productVariantRepository;
+    private final UserRepository userRepository;
+
+    // Quản lý giỏ hàng - Xem toàn bộ giỏ hàng
+    @Override
+    public CartResponseDTO getCartItems(Long userId) {
+        List<CartItem> items = cartItemRepository.findByUser_Id(userId);
+
+        List<CartItemResponseDTO> itemDTOs =  items.stream()
+                .map(this::mapToCartItemResponse)
+                .toList();
+
+        double total = itemDTOs.stream()
+                .mapToDouble(dto -> dto.getPrice() * dto.getQuantity())
+                .sum();
+
+        return CartResponseDTO.builder()
+                .items(itemDTOs)
+                .totalAmount(total)
+                .build();
+    }
+
+    // Thêm vào giỏ hàng
+    @Override
+    @Transactional
+    public CartItemResponseDTO addToCart(Long userId, AddToCartRequestDTO dto) {
+        // Đã lược bỏ các bước check dữ liệu thủ công do Controller đã xử lý bằng @Valid
+
+        ProductVariant variant = productVariantRepository.findById(dto.getVariantId())
+                .orElseThrow(() -> new ResourceNotFoundException("Sản phẩm không tồn tại!"));
+
+        // Kiểm tra tồn kho
+        if (variant.getStockQuantity() < dto.getQuantity()) {
+            throw new BadRequestException("Sản phẩm không đủ số lượng trong kho!");
+        }
+
+        // Kiểm tra sản phẩm đã tồn tại trong giỏ hàng chưa
+        Optional<CartItem> existingItem = cartItemRepository.findByUser_IdAndProductVariant_Id(userId, dto.getVariantId());
+
+        CartItem cartItem;
+        if (existingItem.isPresent()) {
+            // Sản phẩm đã có → cập nhật số lượng
+            cartItem = existingItem.get();
+            int newQuantity = cartItem.getQuantity() + dto.getQuantity();
+
+            if (variant.getStockQuantity() < newQuantity) {
+                throw new BadRequestException("Tổng số lượng vượt quá tồn kho! Trong kho còn " + variant.getStockQuantity() + " sản phẩm.");
+            }
+
+            cartItem.setQuantity(newQuantity);
+        } else {
+            // Sản phẩm chưa có → thêm mới
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Người dùng không tồn tại!"));
+
+            cartItem = CartItem.builder()
+                    .user(user)
+                    .productVariant(variant)
+                    .quantity(dto.getQuantity())
+                    .build();
+        }
+
+        cartItem = cartItemRepository.save(cartItem);
+        return mapToCartItemResponse(cartItem);
+    }
+
+    // Cập nhật số lượng sản phẩm trong giỏ
+    @Override
+    @Transactional
+    public CartItemResponseDTO updateCartItem(Long userId, UpdateCartItemRequestDTO dto) {
+        CartItem cartItem = cartItemRepository.findById(dto.getCartItemId())
+                .orElseThrow(() -> new ResourceNotFoundException("Sản phẩm không có trong giỏ hàng!"));
+
+        if (!cartItem.getUser().getId().equals(userId)) {
+            throw new BadRequestException("Bạn không có quyền thay đổi giỏ hàng này!");
+        }
+
+        // Kiểm tra tồn kho
+        if (cartItem.getProductVariant().getStockQuantity() < dto.getQuantity()) {
+            throw new BadRequestException("Số lượng vượt quá tồn kho!");
+        }
+
+        cartItem.setQuantity(dto.getQuantity());
+        cartItem = cartItemRepository.save(cartItem);
+        return mapToCartItemResponse(cartItem);
+    }
+
+    // Xóa sản phẩm khỏi giỏ hàng
+    @Override
+    @Transactional
+    public MessageResponseDTO removeCartItem(Long userId, Long cartItemId) {
+        CartItem cartItem = cartItemRepository.findById(cartItemId)
+                .orElseThrow(() -> new ResourceNotFoundException("Sản phẩm không có trong giỏ hàng!"));
+
+        if (!cartItem.getUser().getId().equals(userId)) {
+            throw new BadRequestException("Bạn không có quyền xóa sản phẩm này!");
+        }
+
+        cartItemRepository.delete(cartItem);
+
+        return MessageResponseDTO.builder()
+                .message("Đã xóa sản phẩm khỏi giỏ hàng.")
+                .build();
+    }
+
+    private CartItemResponseDTO mapToCartItemResponse(CartItem item) {
+        ProductVariant variant = item.getProductVariant();
+        Product product = variant.getProduct();
+
+        // Tìm hình ảnh phù hợp với màu sắc hoặc lấy hình ảnh đầu tiên
+        String imageUrl = null;
+        if (variant.getColor() != null && !variant.getColor().isEmpty()) {
+            imageUrl = product.getImages().stream()
+                    .filter(img -> variant.getColor().equalsIgnoreCase(img.getColor()))
+                    .map(ProductImage::getUrl)
+                    .findFirst()
+                    .orElse(null);
+        }
+
+        if (imageUrl == null && !product.getImages().isEmpty()) {
+            imageUrl = product.getImages().get(0).getUrl();
+        }
+
+        return CartItemResponseDTO.builder()
+                .cartItemId(item.getId())
+                .variantId(variant.getId())
+                .productId(product.getId())
+                .productName(product.getName())
+                .size(variant.getSize())
+                .color(variant.getColor())
+                .price(variant.getPrice())
+                .quantity(item.getQuantity())
+                .primaryImageUrl(imageUrl)
+                .build();
+    }
+}

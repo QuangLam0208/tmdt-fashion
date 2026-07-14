@@ -1,0 +1,134 @@
+package com.fashion.app.service.payment;
+
+import com.fashion.app.dto.request.ProcessPaymentRequestDTO;
+import com.fashion.app.dto.response.PaymentResponseDTO;
+import com.fashion.app.model.Order;
+import com.fashion.app.model.OrderHistory;
+import com.fashion.app.model.OrderItem;
+import com.fashion.app.model.enums.OrderStatus;
+import com.fashion.app.repository.OrderHistoryRepository;
+import com.fashion.app.repository.OrderItemRepository;
+import com.fashion.app.repository.OrderRepository;
+import com.fashion.app.service.order.OrderManagementService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import com.fashion.app.exception.BadRequestException;
+import com.fashion.app.model.enums.PaymentMethod;
+import com.fashion.app.util.SecurityUtils;
+
+import com.fashion.app.exception.ResourceNotFoundException;
+import org.springframework.security.access.AccessDeniedException;
+
+import java.util.Date;
+import java.util.Map;
+import java.util.Optional;
+
+@Service
+@RequiredArgsConstructor
+public class PaymentServiceImpl implements PaymentService {
+
+    private final OrderRepository orderRepository;
+    private final OrderItemRepository orderItemRepository;
+    private final OrderHistoryRepository orderHistoryRepository;
+    private final MomoService momoService;
+    private final OrderManagementService orderManagementService;
+
+    @Override
+    @Transactional
+    public void processMomoIPN(Map<String, Object> payload) {
+        Map<String, String> stringParams = new java.util.HashMap<>();
+        payload.forEach((k, v) -> stringParams.put(k, String.valueOf(v)));
+
+        if (!momoService.verifySignature(stringParams)) {
+            throw new RuntimeException("Chữ ký MoMo không hợp lệ!");
+        }
+
+        int resultCode = Integer.parseInt(stringParams.get("resultCode"));
+        Long orderId = Long.parseLong(stringParams.get("orderId"));
+
+        updateOrderPayStatus(orderId, resultCode == 0);
+    }
+
+    @Override
+    @Transactional
+    public String processMomoReturn(Map<String, String> allParams) {
+        if (!momoService.verifySignature(allParams)) {
+            return "failed";
+        }
+
+        String resultCode = allParams.get("resultCode");
+        Long orderId = Long.parseLong(allParams.get("orderId"));
+
+        boolean success = "0".equals(resultCode);
+        updateOrderPayStatus(orderId, success);
+
+        return success ? "success" : "failed";
+    }
+
+    private void updateOrderPayStatus(Long orderId, boolean success) {
+        Optional<Order> orderOpt = orderRepository.findById(orderId);
+        if (orderOpt.isPresent()) {
+            Order order = orderOpt.get();
+            for (OrderItem item : order.getOrderItems()) {
+                if (item.getStatus() == OrderStatus.PENDING_PAYMENT || item.getStatus() == OrderStatus.PAYMENT_FAILED) {
+                    OrderStatus previousStatus = item.getStatus();
+                    OrderStatus newStatus = success ? OrderStatus.PAID : OrderStatus.PAYMENT_FAILED;
+
+                    item.setStatus(newStatus);
+                    orderItemRepository.save(item);
+
+                    // Lưu lịch sử nếu thành công
+                    if (success) {
+                        OrderHistory history = OrderHistory.builder()
+                                .orderItem(item)
+                                .previousStatus(previousStatus)
+                                .newStatus(newStatus)
+                                .changeDate(new Date())
+                                .build();
+                        orderHistoryRepository.save(history);
+                    }
+                }
+            }
+            // ĐỒNG BỘ TRẠNG THÁI TỔNG QUÁT CỦA ORDER
+            orderManagementService.updateOverallOrderStatus(order);
+        }
+    }
+
+    @Override
+    @Transactional
+    public PaymentResponseDTO processPayment(ProcessPaymentRequestDTO dto) {
+        Order order = orderRepository.findById(dto.getOrderId())
+                .orElseThrow(() -> new RuntimeException("Đơn hàng không tồn tại!"));
+        // Giữ lại logic cũ (mock) nếu cần, hoặc refactor để dùng chung updateOrderPayStatus
+        updateOrderPayStatus(order.getId(), true);
+        return PaymentResponseDTO.builder()
+                .status("SUCCESS")
+                .message("Thanh toán thành công (Mock)!")
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public PaymentResponseDTO recreateMomoPayment(Long orderId) {
+        Long userId = SecurityUtils.getAuthenticatedUserId();
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Đơn hàng không tồn tại!"));
+
+        if (!order.getUser().getId().equals(userId)) {
+            throw new AccessDeniedException("Bạn không có quyền truy cập đơn hàng này!");
+        }
+
+        if (order.getStatus() != OrderStatus.PENDING_PAYMENT || order.getPaymentMethod() != PaymentMethod.MOMO) {
+            throw new BadRequestException("Đơn hàng không đủ điều kiện để thanh toán lại");
+        }
+
+        String paymentUrl = momoService.createPaymentUrl(order.getId(), order.getTotalAmount());
+
+        return PaymentResponseDTO.builder()
+                .status("SUCCESS")
+                .message("Tạo mới liên kết thanh toán thành công")
+                .paymentUrl(paymentUrl)
+                .build();
+    }
+}
