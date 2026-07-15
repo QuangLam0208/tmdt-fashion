@@ -1,15 +1,8 @@
-// src/customer/pages/landing/AboutPage.js
-// ─────────────────────────────────────────────────────
-//  Trang "Về Chúng Tôi" — 5A Store Fashion
-//  Sections: Hero · Our Story · Core Values · Stats · Our Promise
-// ─────────────────────────────────────────────────────
+
 import React, { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../../styles/about.css';
 
-// ────────────────────────────────────────────
-// SVG ICONS (inline — không cần thư viện ngoài)
-// ────────────────────────────────────────────
 const IconFabric = () => (
   <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#c9a96e" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
     <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
@@ -122,11 +115,11 @@ const AboutPage = () => {
           1. HERO SECTION
           — Không dùng scroll-reveal, dùng CSS animation trực tiếp
       ═══════════════════════════════════════ */}
-      <section className="about-hero" aria-label="Giới thiệu 5A Store">
+      <section className="about-hero" aria-label="Giới thiệu Store">
 
         {/* Left — Text Content */}
         <div className="about-hero__left">
-          <span className="about-hero__eyebrow">5A Store · Est. 2021</span>
+          <span className="about-hero__eyebrow"></span>
 
           <h1 className="about-hero__title">
             Định Hình{' '}
@@ -164,7 +157,7 @@ const AboutPage = () => {
         <div className="about-hero__right">
           <img
             src="https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=900&q=85&auto=format&fit=crop"
-            alt="5A Store — Phong cách thời trang hiện đại"
+            alt=" Phong cách thời trang hiện đại"
             className="about-hero__img"
           />
           <div className="about-hero__overlay" aria-hidden="true" />
@@ -192,22 +185,19 @@ const AboutPage = () => {
             </h2>
             <div className="about-story__body">
               <p>
-                Năm 2021, nhóm sáng lập 5A Store tự hỏi: <strong>Tại sao giới trẻ Việt
-                phải chọn giữa "đẹp" và "túi tiền"?</strong> Thị trường tràn ngập
-                hàng kém chất lượng hoặc những thương hiệu ngoại đắt đỏ không
-                phù hợp vóc dáng người Việt.
+                Năm 2021, nhóm tự hỏi:{' '}
+                <strong>Tại sao giới trẻ Việt phải chọn giữa "đẹp" và "túi tiền"?</strong>{' '}
+                Thị trường tràn ngập hàng kém chất lượng hoặc những thương hiệu ngoại đắt đỏ không phù hợp vóc dáng người Việt.
               </p>
               <p>
-                Chúng tôi bắt đầu từ một studio nhỏ, một đội ngũ đam mê và cam
-                kết rõ ràng: <strong>mang thiết kế hiện đại, chất liệu được tuyển chọn
-                kỹ lưỡng đến tay khách hàng với mức giá thật sự xứng đáng</strong> —
-                không thổi phồng, không đánh đổi chất lượng.
+                Chúng tôi bắt đầu từ một studio nhỏ, một đội ngũ đam mê và cam kết rõ ràng:{' '}
+                <strong>mang thiết kế hiện đại, chất liệu được tuyển chọn kỹ lưỡng đến tay khách hàng với mức giá thật sự xứng đáng</strong>{' '}
+                — không thổi phồng, không đánh đổi chất lượng.
               </p>
               <p>
-                Mỗi bộ sưu tập ra mắt đều mang theo một câu chuyện, một
-                cảm xúc. Chúng tôi không chỉ bán quần áo — chúng tôi
-                đồng hành cùng bạn trong <strong>hành trình tìm và sống với phong
-                cách của riêng mình</strong>.
+                Mỗi bộ sưu tập ra mắt đều mang theo một câu chuyện, một cảm xúc.
+                Chúng tôi không chỉ bán quần áo — chúng tôi đồng hành cùng bạn trong{' '}
+                <strong>hành trình tìm và sống với phong cách của riêng mình</strong>.
               </p>
             </div>
           </div>
@@ -216,7 +206,7 @@ const AboutPage = () => {
           <div className="about-story__img-wrapper about-reveal--right" data-delay="150">
             <img
               src="https://images.unsplash.com/photo-1558769132-cb1aea458c5e?w=800&q=85&auto=format&fit=crop"
-              alt="Phòng studio lookbook tối giản của 5A Store"
+              alt="Phòng studio lookbook tối giản"
               className="about-story__img"
             />
             <p className="about-story__img-caption">
@@ -292,18 +282,18 @@ const AboutPage = () => {
           <span className="about-promise__quote-icon" aria-hidden="true">"</span>
 
           <blockquote className="about-promise__blockquote">
-            Chúng tôi không ngừng sáng tạo vì một lý do duy nhất —
-            để mỗi buổi sáng bạn mở tủ quần áo, bạn tìm thấy{' '}
-            <em>đúng thứ mình cần</em>, cảm thấy tự tin và sẵn sàng
-            chinh phục bất cứ điều gì phía trước. Đó là lời hứa
-            của chúng tôi với mỗi khách hàng của 5A Store.
+            Chúng tôi không ngừng sáng tạo vì một lý do duy nhất — để mỗi buổi sáng
+            bạn mở tủ quần áo, bạn tìm thấy{' '}
+            <em>đúng thứ mình cần</em>,{' '}
+            cảm thấy tự tin và sẵn sàng chinh phục bất cứ điều gì phía trước.
+            Đó là lời hứa của chúng tôi với mỗi khách hàng.
           </blockquote>
 
           <div className="about-promise__divider" aria-hidden="true" />
 
           <div className="about-promise__author">
             <span className="about-promise__author-name">Nguyễn Minh Anh</span>
-            <span className="about-promise__author-role">Co-Founder &amp; Creative Director · 5A Store</span>
+            <span className="about-promise__author-role">Co-Founder &amp; Creative Director</span>
           </div>
         </div>
       </section>
