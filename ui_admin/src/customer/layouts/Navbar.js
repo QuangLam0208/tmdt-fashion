@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { Badge, Button, Drawer, Avatar, Dropdown, message, Typography, Spin, List, Popover } from 'antd';
 import { ShoppingCartOutlined, UserOutlined, LogoutOutlined, OrderedListOutlined, HeartOutlined, HistoryOutlined, WalletOutlined, StarOutlined, CheckOutlined, BellOutlined } from '@ant-design/icons';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import useCart           from '../hooks/useCart';
 import useCustomerAuth   from '../hooks/useCustomerAuth';
 import CartDrawer        from '../components/CartDrawer';
@@ -15,6 +15,7 @@ const Navbar = () => {
   const { isAuthenticated, currentUser, logout } = useCustomerAuth();
   const [cartOpen, setCartOpen]      = useState(false);
   const navigate                     = useNavigate();
+  const location                     = useLocation();
 
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifications, setNotifications] = useState([]);
@@ -220,10 +221,48 @@ const Navbar = () => {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       }}>
         {/* Nav links */}
-        <nav style={{ display: 'flex', gap: 28 }}>
-          {[['/', 'Danh mục'], ['/shop', 'Sản phẩm'], ['/shop?sale=true', 'Sale']].map(([href, label]) => (
-            <Link key={href} to={href} style={{ color: '#333', textDecoration: 'none', fontSize: 14, fontWeight: 500 }}>{label}</Link>
-          ))}
+        <nav style={{ display: 'flex', gap: 28, alignItems: 'center' }}>
+          {[
+            ['/', 'Danh mục'],
+            ['/shop', 'Sản phẩm'],
+            ['/shop?sale=true', 'Sale'],
+            ['/about', 'Về chúng tôi'],
+          ].map(([href, label]) => {
+            // Xác định link đang active
+            const isActive =
+              href === '/'
+                ? location.pathname === '/'
+                : location.pathname.startsWith(href.split('?')[0]);
+            return (
+              <Link
+                key={href}
+                to={href}
+                style={{
+                  position: 'relative',
+                  color: isActive ? '#c9a96e' : '#333',
+                  textDecoration: 'none',
+                  fontSize: 14,
+                  fontWeight: isActive ? 700 : 500,
+                  paddingBottom: 4,
+                  transition: 'color 0.2s ease',
+                }}
+              >
+                {label}
+                {/* Gạch dưới vàng khi active */}
+                {isActive && (
+                  <span style={{
+                    position: 'absolute',
+                    bottom: -2,
+                    left: 0,
+                    right: 0,
+                    height: 2,
+                    background: 'linear-gradient(90deg, #c9a96e, #a8843a)',
+                    borderRadius: 2,
+                  }} />
+                )}
+              </Link>
+            );
+          })}
         </nav>
 
         <Link to="/" style={{ fontFamily: 'serif', fontSize: 22, fontWeight: 700, letterSpacing: 3, color: '#1a1a1a', textDecoration: 'none' }}>
