@@ -1,0 +1,79 @@
+package com.fashion.app.repository;
+
+import com.fashion.app.model.Product;
+import com.fashion.app.model.enums.ProductStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+
+@Repository
+public interface ProductRepository extends JpaRepository<Product, Long> {
+    // Lấy các sản phẩm có trạng thái còn bán
+    List<Product> findByStatus(ProductStatus status);
+
+    // Tìm sản phẩm kết hợp cả Keyword và Category IDs (bao gồm con cháu)
+    @Query("SELECT DISTINCT p FROM Product p " +
+            "LEFT JOIN p.category c " +
+            "WHERE (:keyword IS NULL OR :keyword = '' OR LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR LOWER(c.name) LIKE LOWER(CONCAT('%', :keyword, '%'))) " +
+            "AND (:hasCategory = false OR c.id IN :categoryIds) " +
+            "AND p.status = 'ACTIVE'")
+    Page<Product> findFiltered(@Param("keyword") String keyword, @Param("categoryIds") List<Long> categoryIds,
+                               @Param("hasCategory") boolean hasCategory, Pageable pageable);
+
+    @Query("SELECT p FROM Product p " +
+            "LEFT JOIN p.category c " +
+            "LEFT JOIN p.variants v " +
+            "WHERE (:keyword IS NULL OR :keyword = '' OR LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR LOWER(c.name) LIKE LOWER(CONCAT('%', :keyword, '%'))) " +
+            "AND (:hasCategory = false OR c.id IN :categoryIds) " +
+            "AND p.status = 'ACTIVE' " +
+            "GROUP BY p.id, c.id " + // Cần group by để dùng hàm aggregate MIN
+            "ORDER BY MIN(v.price) ASC")
+    Page<Product> findFilteredOrderByPriceAsc(@Param("keyword") String keyword, @Param("categoryIds") List<Long> categoryIds,
+                                              @Param("hasCategory") boolean hasCategory, Pageable pageable);
+
+    @Query("SELECT p FROM Product p " +
+            "LEFT JOIN p.category c " +
+            "LEFT JOIN p.variants v " +
+            "WHERE (:keyword IS NULL OR :keyword = '' OR LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%')) OR LOWER(c.name) LIKE LOWER(CONCAT('%', :keyword, '%'))) " +
+            "AND (:hasCategory = false OR c.id IN :categoryIds) " +
+            "AND p.status = 'ACTIVE' " +
+            "GROUP BY p.id, c.id " +
+            "ORDER BY MIN(v.price) DESC") // Hoặc MAX(v.price) DESC tùy nghiệp vụ của bạn
+    Page<Product> findFilteredOrderByPriceDesc(@Param("keyword") String keyword, @Param("categoryIds") List<Long> categoryIds,
+                                               @Param("hasCategory") boolean hasCategory, Pageable pageable);
+
+    // Tìm sản phẩm theo danh sách category IDs (bao gồm danh mục cha + con)
+    @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.images i WHERE p.category.id IN :categoryIds AND p.status = 'ACTIVE'")
+    Page<Product> findByCategoryIds(@Param("categoryIds") List<Long> categoryIds, Pageable pageable);
+
+    // Tìm theo keyword + lọc trạng thái + phân trang
+    Page<Product> findByNameContainingIgnoreCaseAndStatus(String keyword, ProductStatus status, Pageable pageable);
+
+    // Admin tìm kiếm sản phẩm theo từ khóa (tên hoặc danh mục) và trạng thái (tùy chọn)
+    @Query("SELECT DISTINCT p FROM Product p LEFT JOIN p.category c WHERE " +
+           "(:keyword IS NULL OR :keyword = '' OR LOWER(p.name) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
+           "OR LOWER(c.name) LIKE LOWER(CONCAT('%', :keyword, '%'))) " +
+            "AND (:categoryId IS NULL OR c.id =:categoryId OR c.parent.id =:categoryId)" +
+           "AND (:status IS NULL OR p.status = :status)")
+    Page<Product> findForAdmin(@Param("keyword") String keyword, @Param("categoryId") Long categoryId, @Param("status") ProductStatus status, Pageable pageable);
+
+    // Lấy danh sách các danh mục duy nhất (giữ tương thích cũ)
+    @Query("SELECT DISTINCT c.name FROM Product p JOIN p.category c")
+    List<String> findDistinctCategories();
+
+    // Recommendation queries
+    @Query("SELECT p.category.id FROM RecentlyViewedItem r JOIN r.product p WHERE r.user.id = :userId GROUP BY p.category.id ORDER BY COUNT(r.id) DESC")
+    List<Long> findTopCategoryIdsByUserId(@Param("userId") Long userId, Pageable pageable);
+
+    @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.images i WHERE p.category.id IN :categoryIds AND p.status = 'ACTIVE' AND p.id NOT IN (SELECT r.product.id FROM RecentlyViewedItem r WHERE r.user.id = :userId)")
+    List<Product> findRecommendedProducts(@Param("categoryIds") List<Long> categoryIds, @Param("userId") Long userId, Pageable pageable);
+
+    @Query("SELECT p FROM Product p LEFT JOIN FETCH p.images i WHERE p.status = 'ACTIVE' ORDER BY p.id DESC")
+    List<Product> findTopSellingProducts(Pageable pageable);
+}
+

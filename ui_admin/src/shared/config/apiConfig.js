@@ -1,0 +1,86 @@
+const BASE = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8080';
+
+export const API_ENDPOINTS = {
+  AUTH: {
+    LOGIN:           `${BASE}/api/auth/login`,
+    LOGOUT:          `${BASE}/api/auth/logout`,
+    REFRESH_TOKEN:   `${BASE}/api/auth/refresh-token`,
+    REGISTER:        `${BASE}/api/auth/register`,
+    FORGOT_PASSWORD: `${BASE}/api/auth/forgot-password`,
+    RESET_PASSWORD:  `${BASE}/api/auth/reset-password`,
+    VERIFY_EMAIL:    `${BASE}/api/auth/verify-email`,
+    RESEND_VERIFICATION: `${BASE}/api/auth/resend-verification`,
+  },
+  DASHBOARD: {
+    STATS:        `${BASE}/api/admin/dashboard/stats`,
+    REVENUE:      `${BASE}/api/admin/dashboard/revenue`,
+    TOP_PRODUCTS: `${BASE}/api/admin/dashboard/top-products`,
+    ORDER_STATUS: `${BASE}/api/admin/dashboard/order-status`,
+  },
+  ADMIN_PRODUCTS: {
+    GET_ALL:   `${BASE}/api/admin/products/list`,
+    GET_BY_ID: (id) => `${BASE}/api/products/${id}`,
+    CREATE:    `${BASE}/api/admin/products/create`,
+    UPDATE:    (id) => `${BASE}/api/admin/products/update/${id}`,
+    DELETE:    (id) => `${BASE}/api/admin/products/delete/${id}`,
+  },
+  CATEGORIES: {
+    GET_ALL:   `${BASE}/api/categories/list`,
+    GET_BY_ID: (id) => `${BASE}/api/categories/${id}`,
+    SEARCH:    `${BASE}/api/categories/search`,        // ?name=keyword
+    CREATE:    `${BASE}/api/admin/categories/create`,
+    UPDATE:    (id) => `${BASE}/api/admin/categories/update/${id}`,
+    DELETE:    (id) => `${BASE}/api/admin/categories/delete/${id}`,
+  },
+  ADMIN_ORDERS: {
+    GET_ALL:       `${BASE}/api/admin/orders`,
+    GET_BY_ID:     (id) => `${BASE}/api/admin/orders/${id}`,
+    CREATE:        `${BASE}/api/admin/orders`,
+    UPDATE_STATUS: (id) => `${BASE}/api/admin/orders/${id}/status`,
+    CANCEL:        (id) => `${BASE}/api/admin/orders/${id}/cancel`,
+  },
+  RETURNS: {
+    GET_ALL:   `${BASE}/api/admin/returns`,
+    GET_BY_ID: (id) => `${BASE}/api/admin/returns/${id}`,
+    APPROVE:   (id) => `${BASE}/api/admin/returns/${id}/approve`,
+    REJECT:    (id) => `${BASE}/api/admin/returns/${id}/reject`,
+    COMPLETE:  (id) => `${BASE}/api/admin/returns/${id}/complete`,
+  },
+  ADMIN_USERS: {
+    GET_ALL:       `${BASE}/api/admin/users`,
+    GET_BY_ID:     (id) => `${BASE}/api/admin/users/${id}`,
+    TOGGLE_STATUS: (id) => `${BASE}/api/admin/users/${id}/toggle-status`,
+    GET_ORDERS:    (id) => `${BASE}/api/admin/users/${id}/orders`,
+  },
+  COUPONS: {
+    GET_ALL:   `${BASE}/api/admin/coupons/list`,
+    GET_BY_ID: (id) => `${BASE}/api/admin/coupons/${id}`,
+    CREATE:    `${BASE}/api/admin/coupons/create`,
+    UPDATE:    (id) => `${BASE}/api/admin/coupons/${id}`,
+    DELETE:    (id) => `${BASE}/api/admin/coupons/${id}`,
+  },
+  SHOP: {
+    PRODUCTS:       `${BASE}/api/products/list`,
+    PRODUCT_DETAIL: (id) => `${BASE}/api/products/${id}`,
+    CATEGORIES:     `${BASE}/api/categories/list`,
+    SEARCH:         `${BASE}/api/products/search`,
+    REVIEWS:        (productId) => `${BASE}/api/products/${productId}/reviews`,
+  },
+  CUSTOMER: {
+    CART_LIST:   `${BASE}/api/cart/list`,
+    CART_CREATE: `${BASE}/api/cart/create`,
+    CART_UPDATE: `${BASE}/api/cart/update`,
+    CART_DELETE: (itemId) => `${BASE}/api/cart/delete/${itemId}`,
+    WISHLIST_LIST:   `${BASE}/api/wishlists/list`,
+    WISHLIST_TOGGLE: `${BASE}/api/wishlists/toggle`,
+    WISHLIST_DELETE: (itemId) => `${BASE}/api/wishlists/${itemId}`,
+    ORDERS:    `${BASE}/api/customer/orders`,
+    ORDER_DETAIL: (id) => `${BASE}/api/customer/orders/${id}`,
+    ADDRESSES: `${BASE}/api/customer/addresses`,
+    CHECKOUT:  `${BASE}/api/customer/checkout`,
+    PROFILE:   `${BASE}/api/customer/profile`,
+  },
+  UPLOAD: {
+    IMAGE: `${BASE}/api/upload/image`,
+  }
+};
