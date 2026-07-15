@@ -1,19 +1,48 @@
 -- MySQL dump 10.13  Distrib 8.0.40, for Win64 (x86_64)
 --
--- Host: 127.0.0.1    Database: fashion_store_db
+-- Host: localhost    Database: fashion_db
 -- ------------------------------------------------------
--- Server version	9.1.0
+-- Server version	8.0.40
 
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
 /*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
 /*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
-/*!50503 SET NAMES utf8 */;
+/*!50503 SET NAMES utf8mb4 */;
 /*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
 /*!40103 SET TIME_ZONE='+00:00' */;
 /*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
 /*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
 /*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+
+--
+-- Table structure for table `addresses`
+--
+
+DROP TABLE IF EXISTS `addresses`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `addresses` (
+  `address_id` bigint NOT NULL AUTO_INCREMENT,
+  `user_id` bigint NOT NULL,
+  `full_address` varchar(500) NOT NULL,
+  `receiver_name` varchar(255) DEFAULT NULL,
+  `receiver_phone` varchar(20) DEFAULT NULL,
+  `is_default` bit(1) NOT NULL DEFAULT b'0',
+  PRIMARY KEY (`address_id`),
+  KEY `FK_addresses_user` (`user_id`),
+  CONSTRAINT `FK_addresses_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `addresses`
+--
+
+LOCK TABLES `addresses` WRITE;
+/*!40000 ALTER TABLE `addresses` DISABLE KEYS */;
+/*!40000 ALTER TABLE `addresses` ENABLE KEYS */;
+UNLOCK TABLES;
 
 --
 -- Table structure for table `cart_items`
@@ -36,6 +65,15 @@ CREATE TABLE `cart_items` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Dumping data for table `cart_items`
+--
+
+LOCK TABLES `cart_items` WRITE;
+/*!40000 ALTER TABLE `cart_items` DISABLE KEYS */;
+/*!40000 ALTER TABLE `cart_items` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `categories`
 --
 
@@ -51,6 +89,15 @@ CREATE TABLE `categories` (
   CONSTRAINT `FKsaok720gsu4u2wrgbk10b5n8d` FOREIGN KEY (`parent_id`) REFERENCES `categories` (`category_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `categories`
+--
+
+LOCK TABLES `categories` WRITE;
+/*!40000 ALTER TABLE `categories` DISABLE KEYS */;
+/*!40000 ALTER TABLE `categories` ENABLE KEYS */;
+UNLOCK TABLES;
 
 --
 -- Table structure for table `coupons`
@@ -69,10 +116,20 @@ CREATE TABLE `coupons` (
   `start_date` datetime(6) NOT NULL,
   `code` varchar(255) NOT NULL,
   `discount_type` enum('FIXED_AMOUNT','PERCENTAGE') NOT NULL,
+  `used_count` int NOT NULL,
   PRIMARY KEY (`coupon_id`),
   UNIQUE KEY `UKeplt0kkm9yf2of2lnx6c1oy9b` (`code`)
 ) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `coupons`
+--
+
+LOCK TABLES `coupons` WRITE;
+/*!40000 ALTER TABLE `coupons` DISABLE KEYS */;
+/*!40000 ALTER TABLE `coupons` ENABLE KEYS */;
+UNLOCK TABLES;
 
 --
 -- Table structure for table `email_logs`
@@ -89,6 +146,15 @@ CREATE TABLE `email_logs` (
   PRIMARY KEY (`email_log_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `email_logs`
+--
+
+LOCK TABLES `email_logs` WRITE;
+/*!40000 ALTER TABLE `email_logs` DISABLE KEYS */;
+/*!40000 ALTER TABLE `email_logs` ENABLE KEYS */;
+UNLOCK TABLES;
 
 --
 -- Table structure for table `notifications`
@@ -113,6 +179,15 @@ CREATE TABLE `notifications` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Dumping data for table `notifications`
+--
+
+LOCK TABLES `notifications` WRITE;
+/*!40000 ALTER TABLE `notifications` DISABLE KEYS */;
+/*!40000 ALTER TABLE `notifications` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `order_histories`
 --
 
@@ -123,13 +198,23 @@ CREATE TABLE `order_histories` (
   `change_date` datetime(6) DEFAULT NULL,
   `order_history` bigint NOT NULL AUTO_INCREMENT,
   `order_item_id` bigint DEFAULT NULL,
-  `new_status` enum('CANCELLED','COMPLETED','DELIVERED','PAID','PAYMENT_EXPIRED','PAYMENT_FAILED','PENDING_CONFIRMATION','PENDING_PAYMENT','PROCESSING','SHIPPING') DEFAULT NULL,
-  `previous_status` enum('CANCELLED','COMPLETED','DELIVERED','PAID','PAYMENT_EXPIRED','PAYMENT_FAILED','PENDING_CONFIRMATION','PENDING_PAYMENT','PROCESSING','SHIPPING') DEFAULT NULL,
+  `new_status` enum('CANCELLED','COMPLETED','CONFIRMED','DELIVERED','PAID','PAYMENT_EXPIRED','PAYMENT_FAILED','PENDING_CONFIRMATION','PENDING_PAYMENT','PROCESSING','RETURNED','SHIPPING') DEFAULT NULL,
+  `previous_status` enum('CANCELLED','COMPLETED','CONFIRMED','DELIVERED','PAID','PAYMENT_EXPIRED','PAYMENT_FAILED','PENDING_CONFIRMATION','PENDING_PAYMENT','PROCESSING','RETURNED','SHIPPING') DEFAULT NULL,
+  `changed_by_admin_id` bigint DEFAULT NULL,
   PRIMARY KEY (`order_history`),
   KEY `FK4o58lw12sghu22ttqmx5sm7l0` (`order_item_id`),
   CONSTRAINT `FK4o58lw12sghu22ttqmx5sm7l0` FOREIGN KEY (`order_item_id`) REFERENCES `order_items` (`order_item_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `order_histories`
+--
+
+LOCK TABLES `order_histories` WRITE;
+/*!40000 ALTER TABLE `order_histories` DISABLE KEYS */;
+/*!40000 ALTER TABLE `order_histories` ENABLE KEYS */;
+UNLOCK TABLES;
 
 --
 -- Table structure for table `order_items`
@@ -148,8 +233,8 @@ CREATE TABLE `order_items` (
   `variant_id` bigint DEFAULT NULL,
   `cancellation_reason` varchar(255) DEFAULT NULL,
   `product_name` varchar(255) DEFAULT NULL,
-  `refund_status` enum('COMPLETED','FAILED','NONE','PENDING') DEFAULT NULL,
-  `status` enum('CANCELLED','COMPLETED','DELIVERED','PAID','PAYMENT_EXPIRED','PAYMENT_FAILED','PENDING_CONFIRMATION','PENDING_PAYMENT','PROCESSING','SHIPPING','CONFIRMED','RETURNED') NOT NULL,
+  `refund_status` enum('COMPLETED','FAILED','NONE','PENDING','REJECTED') DEFAULT NULL,
+  `status` enum('CANCELLED','COMPLETED','CONFIRMED','DELIVERED','PAID','PAYMENT_EXPIRED','PAYMENT_FAILED','PENDING_CONFIRMATION','PENDING_PAYMENT','PROCESSING','RETURNED','SHIPPING') NOT NULL,
   PRIMARY KEY (`order_item_id`),
   KEY `FKbioxgbv59vetrxe0ejfubep1w` (`order_id`),
   KEY `FKemq71edpbn9wsxnxncfn1algp` (`variant_id`),
@@ -159,6 +244,15 @@ CREATE TABLE `order_items` (
   CONSTRAINT `FKemq71edpbn9wsxnxncfn1algp` FOREIGN KEY (`variant_id`) REFERENCES `product_variants` (`variant_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `order_items`
+--
+
+LOCK TABLES `order_items` WRITE;
+/*!40000 ALTER TABLE `order_items` DISABLE KEYS */;
+/*!40000 ALTER TABLE `order_items` ENABLE KEYS */;
+UNLOCK TABLES;
 
 --
 -- Table structure for table `orders`
@@ -174,7 +268,7 @@ CREATE TABLE `orders` (
   `order_date` datetime(6) NOT NULL,
   `order_id` bigint NOT NULL AUTO_INCREMENT,
   `user_id` bigint DEFAULT NULL,
-  `shipping_address` varchar(500) DEFAULT NULL,
+  `shipping_address` varchar(255) DEFAULT NULL,
   `payment_method` enum('BANK_TRANSFER','COD','MOMO','VNPAY') NOT NULL,
   `status` enum('CANCELLED','COMPLETED','DELIVERED','PAID','PAYMENT_EXPIRED','PAYMENT_FAILED','PENDING_CONFIRMATION','PENDING_PAYMENT','PROCESSING','SHIPPING','CONFIRMED','RETURNED') NOT NULL,
   `type` enum('OFFLINE','ONLINE') NOT NULL,
@@ -185,6 +279,15 @@ CREATE TABLE `orders` (
   CONSTRAINT `FKn1d1gkxckw648m2n2d5gx0yx5` FOREIGN KEY (`coupon_id`) REFERENCES `coupons` (`coupon_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `orders`
+--
+
+LOCK TABLES `orders` WRITE;
+/*!40000 ALTER TABLE `orders` DISABLE KEYS */;
+/*!40000 ALTER TABLE `orders` ENABLE KEYS */;
+UNLOCK TABLES;
 
 --
 -- Table structure for table `otps`
@@ -204,6 +307,15 @@ CREATE TABLE `otps` (
   CONSTRAINT `FKseso6nlp9f5fbuilrngn3pbyi` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `otps`
+--
+
+LOCK TABLES `otps` WRITE;
+/*!40000 ALTER TABLE `otps` DISABLE KEYS */;
+/*!40000 ALTER TABLE `otps` ENABLE KEYS */;
+UNLOCK TABLES;
 
 --
 -- Table structure for table `password_reset_tokens`
@@ -226,6 +338,49 @@ CREATE TABLE `password_reset_tokens` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Dumping data for table `password_reset_tokens`
+--
+
+LOCK TABLES `password_reset_tokens` WRITE;
+/*!40000 ALTER TABLE `password_reset_tokens` DISABLE KEYS */;
+/*!40000 ALTER TABLE `password_reset_tokens` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `payment_transactions`
+--
+
+DROP TABLE IF EXISTS `payment_transactions`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `payment_transactions` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `amount` double NOT NULL,
+  `created_at` datetime(6) NOT NULL,
+  `processed_at` datetime(6) DEFAULT NULL,
+  `provider` enum('MOMO') NOT NULL,
+  `raw_response_payload` text,
+  `request_id` varchar(100) DEFAULT NULL,
+  `status` enum('FAILED','PENDING','SUCCESS') NOT NULL,
+  `trans_id` varchar(100) DEFAULT NULL,
+  `order_id` bigint NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_payment_transaction_provider_trans_id` (`provider`,`trans_id`),
+  KEY `FKnsous9qyrjv5ss8que6o6617` (`order_id`),
+  CONSTRAINT `FKnsous9qyrjv5ss8que6o6617` FOREIGN KEY (`order_id`) REFERENCES `orders` (`order_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `payment_transactions`
+--
+
+LOCK TABLES `payment_transactions` WRITE;
+/*!40000 ALTER TABLE `payment_transactions` DISABLE KEYS */;
+/*!40000 ALTER TABLE `payment_transactions` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `product_images`
 --
 
@@ -242,6 +397,15 @@ CREATE TABLE `product_images` (
   CONSTRAINT `FKqnq71xsohugpqwf3c9gxmsuy` FOREIGN KEY (`product_id`) REFERENCES `products` (`product_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=641 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `product_images`
+--
+
+LOCK TABLES `product_images` WRITE;
+/*!40000 ALTER TABLE `product_images` DISABLE KEYS */;
+/*!40000 ALTER TABLE `product_images` ENABLE KEYS */;
+UNLOCK TABLES;
 
 --
 -- Table structure for table `product_variants`
@@ -264,6 +428,15 @@ CREATE TABLE `product_variants` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Dumping data for table `product_variants`
+--
+
+LOCK TABLES `product_variants` WRITE;
+/*!40000 ALTER TABLE `product_variants` DISABLE KEYS */;
+/*!40000 ALTER TABLE `product_variants` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `products`
 --
 
@@ -282,6 +455,15 @@ CREATE TABLE `products` (
   CONSTRAINT `FKog2rp4qthbtt2lfyhfo32lsw9` FOREIGN KEY (`category_id`) REFERENCES `categories` (`category_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=81 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `products`
+--
+
+LOCK TABLES `products` WRITE;
+/*!40000 ALTER TABLE `products` DISABLE KEYS */;
+/*!40000 ALTER TABLE `products` ENABLE KEYS */;
+UNLOCK TABLES;
 
 --
 -- Table structure for table `recently_viewed_items`
@@ -304,6 +486,15 @@ CREATE TABLE `recently_viewed_items` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Dumping data for table `recently_viewed_items`
+--
+
+LOCK TABLES `recently_viewed_items` WRITE;
+/*!40000 ALTER TABLE `recently_viewed_items` DISABLE KEYS */;
+/*!40000 ALTER TABLE `recently_viewed_items` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `refresh_tokens`
 --
 
@@ -324,6 +515,15 @@ CREATE TABLE `refresh_tokens` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Dumping data for table `refresh_tokens`
+--
+
+LOCK TABLES `refresh_tokens` WRITE;
+/*!40000 ALTER TABLE `refresh_tokens` DISABLE KEYS */;
+/*!40000 ALTER TABLE `refresh_tokens` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `return_request_images`
 --
 
@@ -331,12 +531,23 @@ DROP TABLE IF EXISTS `return_request_images`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `return_request_images` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
   `return_request_id` bigint NOT NULL,
   `image_url` text,
+  PRIMARY KEY (`id`),
   KEY `FK7nxmq79c6hebam5151wp75yli` (`return_request_id`),
   CONSTRAINT `FK7nxmq79c6hebam5151wp75yli` FOREIGN KEY (`return_request_id`) REFERENCES `return_requests` (`return_request_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `return_request_images`
+--
+
+LOCK TABLES `return_request_images` WRITE;
+/*!40000 ALTER TABLE `return_request_images` DISABLE KEYS */;
+/*!40000 ALTER TABLE `return_request_images` ENABLE KEYS */;
+UNLOCK TABLES;
 
 --
 -- Table structure for table `return_requests`
@@ -367,6 +578,15 @@ CREATE TABLE `return_requests` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Dumping data for table `return_requests`
+--
+
+LOCK TABLES `return_requests` WRITE;
+/*!40000 ALTER TABLE `return_requests` DISABLE KEYS */;
+/*!40000 ALTER TABLE `return_requests` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `review_images`
 --
 
@@ -382,6 +602,15 @@ CREATE TABLE `review_images` (
   CONSTRAINT `FK3aayo5bjciyemf3bvvt987hkr` FOREIGN KEY (`review_id`) REFERENCES `reviews` (`review_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `review_images`
+--
+
+LOCK TABLES `review_images` WRITE;
+/*!40000 ALTER TABLE `review_images` DISABLE KEYS */;
+/*!40000 ALTER TABLE `review_images` ENABLE KEYS */;
+UNLOCK TABLES;
 
 --
 -- Table structure for table `reviews`
@@ -409,6 +638,15 @@ CREATE TABLE `reviews` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Dumping data for table `reviews`
+--
+
+LOCK TABLES `reviews` WRITE;
+/*!40000 ALTER TABLE `reviews` DISABLE KEYS */;
+/*!40000 ALTER TABLE `reviews` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `tokens`
 --
 
@@ -430,6 +668,15 @@ CREATE TABLE `tokens` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Dumping data for table `tokens`
+--
+
+LOCK TABLES `tokens` WRITE;
+/*!40000 ALTER TABLE `tokens` DISABLE KEYS */;
+/*!40000 ALTER TABLE `tokens` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
 -- Table structure for table `user_coupons`
 --
 
@@ -448,6 +695,15 @@ CREATE TABLE `user_coupons` (
   CONSTRAINT `FK9oi3p5xyfe4j32xs54nn7mi20` FOREIGN KEY (`coupon_id`) REFERENCES `coupons` (`coupon_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `user_coupons`
+--
+
+LOCK TABLES `user_coupons` WRITE;
+/*!40000 ALTER TABLE `user_coupons` DISABLE KEYS */;
+/*!40000 ALTER TABLE `user_coupons` ENABLE KEYS */;
+UNLOCK TABLES;
 
 --
 -- Table structure for table `users`
@@ -477,23 +733,13 @@ CREATE TABLE `users` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Table structure for table `addresses`
+-- Dumping data for table `users`
 --
 
-DROP TABLE IF EXISTS `addresses`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `addresses` (
-  `address_id`   bigint NOT NULL AUTO_INCREMENT,
-  `user_id`      bigint NOT NULL,
-  `full_address` varchar(500) NOT NULL,
-  `receiver_name`   varchar(255) DEFAULT NULL,
-  `receiver_phone`  varchar(20)  DEFAULT NULL,
-  `is_default`   bit(1) NOT NULL DEFAULT b'0',
-  PRIMARY KEY (`address_id`),
-  KEY `FK_addresses_user` (`user_id`),
-  CONSTRAINT `FK_addresses_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+LOCK TABLES `users` WRITE;
+/*!40000 ALTER TABLE `users` DISABLE KEYS */;
+/*!40000 ALTER TABLE `users` ENABLE KEYS */;
+UNLOCK TABLES;
 
 --
 -- Table structure for table `wishlist_items`
@@ -513,6 +759,15 @@ CREATE TABLE `wishlist_items` (
   CONSTRAINT `FKqxj7lncd242b59fb78rqegyxj` FOREIGN KEY (`product_id`) REFERENCES `products` (`product_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `wishlist_items`
+--
+
+LOCK TABLES `wishlist_items` WRITE;
+/*!40000 ALTER TABLE `wishlist_items` DISABLE KEYS */;
+/*!40000 ALTER TABLE `wishlist_items` ENABLE KEYS */;
+UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
@@ -523,4 +778,4 @@ CREATE TABLE `wishlist_items` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-04-02 13:30:18
+-- Dump completed on 2026-07-15 17:31:51
