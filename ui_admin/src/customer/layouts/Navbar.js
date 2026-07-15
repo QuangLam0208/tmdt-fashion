@@ -23,6 +23,7 @@ const NAV_LINKS = [
   ['/', 'Danh mục'],
   ['/shop', 'Sản phẩm'],
   ['/shop?sale=true', 'Sale'],
+  ['/about', 'Về chúng tôi'],
 ];
 
 const Navbar = () => {
