@@ -1,9 +1,10 @@
 // src/customer/components/CartDrawer.js
 import React from 'react';
-import { Drawer, Button, Space, Typography, List, Avatar, InputNumber, Empty, Popconfirm } from 'antd';
-import { DeleteOutlined, ShoppingCartOutlined, ArrowRightOutlined } from '@ant-design/icons';
+import { Drawer, Button, Space, Typography, List, Avatar, Empty, Popconfirm, Modal } from 'antd';
+import { DeleteOutlined, ShoppingCartOutlined, ArrowRightOutlined, LoginOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import useCart from '../hooks/useCart';
+import useCustomerAuth from '../hooks/useCustomerAuth';
 import { formatCurrency } from '../../shared/utils/formatters';
 import QuantityInput from './QuantityInput';
 
@@ -11,9 +12,36 @@ const { Text } = Typography;
 
 const CartDrawer = ({ open, onClose }) => {
   const { items, totalPrice, totalItems, updateQuantity, removeItem, loading } = useCart();
+  const { isAuthenticated } = useCustomerAuth();
   const navigate = useNavigate();
 
   const handleCheckout = () => {
+    if (!isAuthenticated) {
+      // Hiện modal xác nhận thày vì redirect thầm lặng
+      Modal.confirm({
+        title: 'Đăng nhập để tiếp tục',
+        content: (
+          <div style={{ textAlign: 'center', padding: '8px 0' }}>
+            <p style={{ fontSize: 15, color: '#555', marginBottom: 8 }}>
+              Giỏ hàng của bạn sẽ được giữ nguyên sau khi đăng nhập.
+            </p>
+            <p style={{ fontSize: 13, color: '#94a3b8' }}>
+              Bạn cần đăng nhập để tiến hành thanh toán.
+            </p>
+          </div>
+        ),
+        okText: <><LoginOutlined /> Đăng nhập ngay</>,
+        cancelText: 'Tiếp tục mua sắm',
+        okButtonProps: { style: { background: '#1a1a1a', borderColor: '#1a1a1a' } },
+        onOk: () => {
+          onClose();
+          navigate('/login', { state: { from: { pathname: '/checkout' } } });
+        },
+        centered: true,
+        icon: <ShoppingCartOutlined style={{ color: '#1a1a1a' }} />,
+      });
+      return;
+    }
     onClose();
     navigate('/checkout');
   };

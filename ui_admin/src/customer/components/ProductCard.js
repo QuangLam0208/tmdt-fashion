@@ -37,7 +37,7 @@ const ProductCard = ({ product, showActions = true, initialWishlisted, onWishlis
 
   const handleAddToCart = (e) => {
     e.stopPropagation();
-    if (!isAuthenticated) return requireLogin();
+    // Khách vãng lai vẫn có thể vào trang chi tiết để chọn variant và thêm vào giỏ
     navigate(`/shop/${productId}`);
   };
 

@@ -20,6 +20,9 @@ public class MomoConfig {
     @Value("${momo.api-url}")
     private String apiUrl;
 
+    @Value("${momo.query-url}")
+    private String queryUrl;
+
     @Value("${momo.return-url}")
     private String returnUrl;
 
