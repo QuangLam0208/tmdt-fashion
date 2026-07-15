@@ -64,6 +64,16 @@ public class ProductController {
     }
 
     /**
+     * GET /api/products/for-you?userId=1
+     */
+    @GetMapping("/for-you")
+    public ResponseEntity<List<ProductSummaryResponseDTO>> getRecommendations(
+            @RequestParam(required = false) Long userId
+    ) {
+        return ResponseEntity.ok(productService.getRecommendations(userId));
+    }
+
+    /**
      * GET /api/products/categories
      * Dùng cho dropdown chọn danh mục khi tạo/lọc sản phẩm
      */

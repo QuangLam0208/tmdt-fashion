@@ -8,6 +8,8 @@ import '../../styles/landing.css';
 import '../../styles/customer.css';
 import { shopProductService } from '../../services/shopProductService';
 import { shopCategoryService } from '../../services/shopCategoryService';
+import RecommendedProducts from '../../components/RecommendedProducts';
+
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -132,6 +134,10 @@ const LandingPage = () => {
 
         </div>
       </section>
+
+      <div className="c-container">
+        <RecommendedProducts />
+      </div>
 
       <section className="landing-section landing-section--alt">
         <div className="c-container">

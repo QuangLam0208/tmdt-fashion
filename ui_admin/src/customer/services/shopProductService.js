@@ -29,5 +29,12 @@ export const shopProductService = {
   getRelated: async (id, limit = 4) => {
     const res = await axiosInstance.get(`/api/products/${id}/related?limit=${limit}`);
     return res.data;
-  },  
+  },
+
+  /** Gợi ý sản phẩm cho người dùng (Content-based) */
+  getRecommendations: async (userId) => {
+    const url = userId ? `/api/products/for-you?userId=${userId}` : `/api/products/for-you`;
+    const res = await axiosInstance.get(url);
+    return res.data;
+  }
 };
