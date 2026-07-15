@@ -69,9 +69,3 @@ input, textarea, select {
 ::-webkit-scrollbar-thumb:hover {
   background: #a8843a;
 }
-
-/* ── Scroll-reveal utility (dùng bởi AboutPage IntersectionObserver) ── */
-[data-reveal].revealed {
-  opacity: 1 !important;
-  transform: none !important;
-}
