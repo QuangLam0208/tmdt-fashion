@@ -478,9 +478,9 @@ INSERT INTO `orders` (`order_id`, `user_id`, `coupon_id`, `total_amount`, `statu
 -- ========================================================
 INSERT INTO `return_requests` (`return_request_id`, `order_id`, `user_id`, `reason`, `description`, `status`, `request_date`, `processed_by`, `processed_at`, `rejection_reason`) VALUES
 (1, 4, 6, 'Lỗi sản phẩm', 'Áo khoác bomber bị rách chỉ ở phần tay áo.', 'PENDING', '2024-03-26 10:00:00', NULL, NULL, NULL),
-(2, 33, 5, 'Không đúng mô tả', 'Áo sơ mi lụa nhận được không đúng như hình, chất liệu khác mô tả.', 'COMPLETED', '2024-05-16 10:00:00', 1, 2024-05-18 09:00:00, NULL),
-(3, 34, 6, 'Lỗi sản phẩm', 'Áo blazer nữ bị lỗi đường may ở tay áo.', 'COMPLETED', '2024-05-17 09:00:00', 1, 2024-05-19 10:00:00, NULL),
-(4, 42, 12, 'Giao sai màu', 'Túi trống thể thao giao nhầm màu so với đơn đặt.', 'COMPLETED', '2024-05-21 10:00:00', 2, 2024-05-23 11:00:00, NULL);
+(2, 33, 5, 'Không đúng mô tả', 'Áo sơ mi lụa nhận được không đúng như hình, chất liệu khác mô tả.', 'COMPLETED', '2024-05-16 10:00:00', 1, '2024-05-18 09:00:00', NULL),
+(3, 34, 6, 'Lỗi sản phẩm', 'Áo blazer nữ bị lỗi đường may ở tay áo.', 'COMPLETED', '2024-05-17 09:00:00', 1, '2024-05-19 10:00:00', NULL),
+(4, 42, 12, 'Giao sai màu', 'Túi trống thể thao giao nhầm màu so với đơn đặt.', 'COMPLETED', '2024-05-21 10:00:00', 2, '2024-05-23 11:00:00', NULL);
 
 -- ========================================================
 -- RETURN_REQUEST_IMAGES (bổ sung ảnh minh chứng cho 3 yêu cầu hoàn trả mới)
