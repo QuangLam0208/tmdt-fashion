@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Row, Col, Button, InputNumber, Spin, Breadcrumb, message, Divider, Space, Rate, Avatar, List, Typography, Image, Pagination } from 'antd';
-import { HomeOutlined, ShoppingCartOutlined, CreditCardOutlined, UserOutlined } from '@ant-design/icons';
+import { Row, Col, Button, InputNumber, Spin, Breadcrumb, message, Divider, Space, Rate, Avatar, List, Typography, Image, Pagination, Modal } from 'antd';
+import { HomeOutlined, ShoppingCartOutlined, CreditCardOutlined, UserOutlined, LoginOutlined } from '@ant-design/icons';
 import { shopProductService } from '../../services/shopProductService';
 import { reviewService } from '../../services/reviewService';
 import useCart from '../../hooks/useCart';
+import useCustomerAuth from '../../hooks/useCustomerAuth';
 import { formatCurrency, formatDateTime } from '../../../shared/utils/formatters';
 import ProductCard from '../../components/ProductCard';
 import QuantityInput from '../../components/QuantityInput';
@@ -22,6 +23,7 @@ const ProductDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { addItem } = useCart();
+  const { isAuthenticated } = useCustomerAuth();
 
   const [product, setProduct] = useState(null);
   const [relatedProducts, setRelatedProducts] = useState([]);
@@ -127,6 +129,27 @@ const ProductDetailPage = () => {
   };
 
   const handleBuyNow = () => {
+    if (!isAuthenticated) {
+      // Thêm vào giỏ trước, rồi nhắc đăng nhập
+      handleAddToCart();
+      Modal.confirm({
+        title: 'Đăng nhập để tiếp tục',
+        content: (
+          <div style={{ textAlign: 'center', padding: '8px 0' }}>
+            <p style={{ fontSize: 15, color: '#555', marginBottom: 8 }}>
+              Sản phẩm đã được thêm vào giỏ hàng. Đăng nhập để thanh toán ngay!
+            </p>
+          </div>
+        ),
+        okText: <><LoginOutlined /> Đăng nhập ngay</>,
+        cancelText: 'Tiếp tục mua sắm',
+        okButtonProps: { style: { background: '#1a1a1a', borderColor: '#1a1a1a' } },
+        onOk: () => navigate('/login', { state: { from: { pathname: '/checkout' } } }),
+        centered: true,
+        icon: <ShoppingCartOutlined style={{ color: '#1a1a1a' }} />,
+      });
+      return;
+    }
     handleAddToCart();
     setTimeout(() => navigate('/checkout'), 500);
   };
