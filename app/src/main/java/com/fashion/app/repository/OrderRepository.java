@@ -93,4 +93,8 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     @Query("SELECT o FROM Order o WHERE o.orderDate BETWEEN :startDate AND :endDate")
     List<Order> findAllOrdersByDateRange(@Param("startDate") Instant startDate, @Param("endDate") Instant endDate);
+
+    // ANALYTICS: Doanh thu theo năm
+    @Query("SELECT YEAR(o.orderDate) as yr, SUM(o.totalAmount) FROM Order o WHERE o.status IN ('DELIVERED', 'COMPLETED') GROUP BY YEAR(o.orderDate) ORDER BY yr ASC")
+    List<Object[]> findYearlyRevenue();
 }
