@@ -9,6 +9,9 @@ import useCustomerAuth from '../../hooks/useCustomerAuth';
 import { formatCurrency, formatDateTime } from '../../../shared/utils/formatters';
 import ProductCard from '../../components/ProductCard';
 import QuantityInput from '../../components/QuantityInput';
+import FlashSaleTimer from '../../components/FlashSaleTimer';
+import { Helmet } from 'react-helmet-async';
+import ReactGA from 'react-ga4';
 
 const { Text, Paragraph } = Typography;
 
@@ -28,7 +31,7 @@ const ProductDetailPage = () => {
   const [product, setProduct] = useState(null);
   const [relatedProducts, setRelatedProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  
+
   const [quantity, setQuantity] = useState(1);
   const [selectedVariant, setSelectedVariant] = useState(null);
   const [mainImage, setMainImage] = useState('');
@@ -51,10 +54,25 @@ const ProductDetailPage = () => {
         const productData = data?.data || data;
         setProduct(productData);
         setMainImage(productData.mainImage || 'https://placehold.co/600x600?text=No+Image');
-        
+
         if (productData.variants && productData.variants.length > 0) {
           setSelectedVariant(productData.variants[0]);
         }
+
+        // --- GẮN SỰ KIỆN VIEW_ITEM (GA4) ---
+        ReactGA.event("view_item", {
+          currency: "VND",
+          value: productData.price || productData.minPrice || 0,
+          items: [
+            {
+              item_id: productData.productId || id,
+              item_name: productData.name,
+              price: productData.price || productData.minPrice || 0,
+              quantity: 1
+            }
+          ]
+        });
+        // ----------------------------------
 
         try {
           const relatedData = await shopProductService.getRelated(id, 4);
@@ -70,7 +88,7 @@ const ProductDetailPage = () => {
         setLoading(false);
       }
     };
-    
+
     fetchProductAndRelated();
     setQuantity(1);
   }, [id, navigate]);
@@ -89,11 +107,11 @@ const ProductDetailPage = () => {
         size: 5,
         sort: 'createdAt,desc'
       });
-      
+
       const responseData = res?.data || res;
-      setReviewsData(responseData.reviews?.content || []); 
-      setReviewTotal(responseData.reviews?.totalElements || 0); 
-      
+      setReviewsData(responseData.reviews?.content || []);
+      setReviewTotal(responseData.reviews?.totalElements || 0);
+
       setReviewSummary({
         averageRating: responseData.averageRating || 0,
         totalReviews: responseData.totalReviews || 0
@@ -126,6 +144,22 @@ const ProductDetailPage = () => {
       return;
     }
     addItem({ variantId: selectedVariant?.variantId, quantity: finalQuantity });
+
+    // --- GẮN SỰ KIỆN ADD_TO_CART (GA4) ---
+    ReactGA.event("add_to_cart", {
+      currency: "VND",
+      value: (selectedVariant?.price || product.price || 0) * finalQuantity,
+      items: [
+        {
+          item_id: product.productId || id,
+          item_name: product.name,
+          item_variant: selectedVariant?.color || '',
+          price: selectedVariant?.price || product.price || 0,
+          quantity: finalQuantity
+        }
+      ]
+    });
+    // -------------------------------------
   };
 
   const handleBuyNow = () => {
@@ -161,8 +195,48 @@ const ProductDetailPage = () => {
   const displayStock = selectedVariant ? selectedVariant.stockQuantity : (product.variants?.reduce((sum, v) => sum + v.stockQuantity, 0) || 0);
   const isOutOfStock = displayStock <= 0 || product.status === 'OUT_OF_STOCK';
 
+  // --- BẮT ĐẦU PHẦN SEO ON-PAGE & STRUCTURED DATA ---
+  const pageUrl = typeof window !== 'undefined' ? window.location.href : '';
+  const productSchema = {
+    "@context": "https://schema.org/",
+    "@type": "Product",
+    "name": product.name,
+    "image": product.images ? product.images.map(img => img.url) : [mainImage],
+    "description": product.description ? product.description.replace(/<[^>]*>?/gm, '') : product.name,
+    "sku": product.productId || id,
+    "offers": {
+      "@type": "Offer",
+      "url": pageUrl,
+      "priceCurrency": "VND",
+      "price": displayPrice,
+      "availability": isOutOfStock ? "https://schema.org/OutOfStock" : "https://schema.org/InStock"
+    },
+    "aggregateRating": reviewSummary.totalReviews > 0 ? {
+      "@type": "AggregateRating",
+      "ratingValue": reviewSummary.averageRating,
+      "reviewCount": reviewSummary.totalReviews
+    } : undefined
+  };
+  // --- KẾT THÚC PHẦN SCHEMA ---
+
   return (
     <div style={{ backgroundColor: '#f9fafb', minHeight: '100vh', paddingBottom: 60 }}>
+      <Helmet>
+        <title>{product.name} | TMDT Fashion</title>
+        <meta name="description" content={`Mua ngay ${product.name} với giá ưu đãi. Sản phẩm thời trang chất lượng cao.`} />
+        
+        {/* Open Graph cho Facebook/Zalo */}
+        <meta property="og:title" content={product.name} />
+        <meta property="og:description" content={`Mua ngay ${product.name} với giá ưu đãi. Phân phối chính hãng.`} />
+        <meta property="og:image" content={mainImage} />
+        <meta property="og:url" content={pageUrl} />
+        <meta property="og:type" content="product" />
+
+        {/* Chèn file JSON-LD */}
+        <script type="application/ld+json">
+          {JSON.stringify(productSchema)}
+        </script>
+      </Helmet>
       {/* ... (Phần Breadcrumb và Header giữ nguyên) ... */}
       <div style={{ backgroundColor: '#fff', borderBottom: '1px solid #eaeaea', padding: '16px 0', marginBottom: 32 }}>
         <div className="c-container">
@@ -196,13 +270,17 @@ const ProductDetailPage = () => {
 
             <Col xs={24} md={14}>
               <h1 style={{ fontSize: 24, fontWeight: 700, marginBottom: 8, color: '#1a1a1a' }}>{product.name}</h1>
-              
+
               <Space style={{ marginBottom: 16, alignItems: 'center' }}>
                 <Rate disabled value={reviewSummary.averageRating} allowHalf style={{ fontSize: 16, color: '#fadb14' }} />
                 <span style={{ color: '#64748b', fontSize: 15 }}>
                   {reviewSummary.averageRating?.toFixed(1)} ({reviewSummary.totalReviews} Đánh giá)
                 </span>
               </Space>
+
+              {/* === MODULE ĐẾM NGƯỢC FLASH SALE === */}
+              {/* Lưu ý: Để có hiệu ứng trực quan, mình đang lấy thời gian hiện tại cộng thêm 2 tiếng làm mốc kết thúc */}
+              <FlashSaleTimer targetDate={new Date(new Date().getTime() + 1000 * 60 * 60 * 2).toISOString()} />
 
               <div style={{ background: '#fafafa', padding: '16px 24px', borderRadius: 8, marginBottom: 24 }}>
                 <div style={{ fontSize: 28, fontWeight: 700, color: '#e53935' }}>{formatCurrency(displayPrice)}</div>
@@ -255,7 +333,7 @@ const ProductDetailPage = () => {
           {/* === DANH SÁCH ĐÁNH GIÁ TỪ API (US-41) === */}
           <div ref={reviewsRef}>
             <h3 style={{ fontSize: 20, fontWeight: 700, marginBottom: 24 }}>Đánh giá từ khách hàng</h3>
-            
+
             {/* AC-US41-02: Khối thống kê tổng quát */}
             <div style={{ display: 'flex', alignItems: 'center', background: '#fffbf0', padding: 24, borderRadius: 8, marginBottom: 24, border: '1px solid #ffe58f' }}>
               <div style={{ textAlign: 'center', marginRight: 48 }}>
@@ -315,14 +393,14 @@ const ProductDetailPage = () => {
                     </List.Item>
                   )}
                 />
-                
+
                 {/* AC-FE-US41-02: Phân trang */}
                 <div style={{ textAlign: 'center', marginTop: 32 }}>
-                  <Pagination 
-                    current={reviewPage} 
-                    pageSize={5} 
-                    total={reviewTotal} 
-                    onChange={handleReviewPageChange} 
+                  <Pagination
+                    current={reviewPage}
+                    pageSize={5}
+                    total={reviewTotal}
+                    onChange={handleReviewPageChange}
                     showSizeChanger={false}
                   />
                 </div>
@@ -347,7 +425,7 @@ const ProductDetailPage = () => {
             <Row gutter={[24, 24]}>
               {relatedProducts.map(relProduct => (
                 <Col xs={12} sm={12} md={8} lg={6} key={relProduct.productId || relProduct.id}>
-                  <ProductCard product={relProduct} /> 
+                  <ProductCard product={relProduct} />
                 </Col>
               ))}
             </Row>

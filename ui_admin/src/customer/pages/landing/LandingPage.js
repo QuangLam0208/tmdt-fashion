@@ -7,6 +7,8 @@ import '../../styles/landing.css';
 import '../../styles/customer.css';
 import { shopProductService } from '../../services/shopProductService';
 import { shopCategoryService } from '../../services/shopCategoryService';
+import RecommendedProducts from '../../components/RecommendedProducts';
+
 
 // ─── Lazy load ProductCard để không chặn paint ban đầu ─────────────────────
 const ProductCard = lazy(() => import('../../components/ProductCard'));
@@ -114,6 +116,7 @@ const LandingPage = () => {
       </section>
 
       {/* ── Sản Phẩm Nổi Bật (Lazy load ProductCard) ───────────────────── */}
+
       <section className="landing-section landing-section--alt">
         <div className="c-container">
           <h2 className="c-section-title">Sản Phẩm Nổi Bật</h2>

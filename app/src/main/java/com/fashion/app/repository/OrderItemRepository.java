@@ -6,6 +6,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -38,13 +39,10 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
     // Truy vấn các sản phẩm đã đánh giá (Dùng cho Lịch sử Review)
     Page<OrderItem> findByOrderUserIdAndIsReviewedTrueOrderByOrderOrderDateDesc(Long userId, Pageable pageable);
 
-    // DASHBOARD - Top 5 sản phẩm bán chạy nhất
-    @Query("SELECT oi.productName, SUM(oi.quantity), SUM(oi.quantity * oi.price) " +
-            "FROM OrderItem oi WHERE oi.status = com.fashion.app.model.enums.OrderStatus.DELIVERED " +
-            "OR oi.status = com.fashion.app.model.enums.OrderStatus.COMPLETED " +
-            "GROUP BY oi.productName ORDER BY SUM(oi.quantity) DESC")
     // Kiểm tra xem một biến thể sản phẩm đã từng nằm trong bất kỳ đơn hàng nào chưa
-    boolean existsByProductVariantId(Long variantId);
+    @Query("SELECT COUNT(oi) > 0 FROM OrderItem oi WHERE oi.productVariant.id = :variantId")
+    boolean existsByProductVariantId(@Param("variantId") Long variantId);
+
     // DASHBOARD - Top 5 sản phẩm bán chạy nhất (Bổ sung thêm Product ID)
     @Query("SELECT oi.productVariant.product.id, oi.productName, SUM(oi.quantity), SUM(oi.quantity * oi.price) " +
             "FROM OrderItem oi WHERE oi.status = com.fashion.app.model.enums.OrderStatus.DELIVERED " +
