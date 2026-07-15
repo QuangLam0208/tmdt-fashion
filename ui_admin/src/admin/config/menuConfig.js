@@ -4,6 +4,7 @@ import {
   TagOutlined,
   LineChartOutlined,
   DesktopOutlined,
+  BarChartOutlined
 } from '@ant-design/icons';
 
 export const MENU_ITEMS = [
@@ -16,4 +17,5 @@ export const MENU_ITEMS = [
   { key: '/admin/coupons',    icon: <TagOutlined />,          label: 'Khuyến mãi',  path: '/admin/coupons'        },
   { key: '/admin/reports',    icon: <LineChartOutlined />,    label: 'Báo cáo doanh thu', path: '/admin/reports'  },
   { key: '/admin/pos',        icon: <DesktopOutlined />,      label: 'Bán hàng (POS)',    path: '/admin/pos' },
+  { key: '/admin/analytics',  icon: <BarChartOutlined />,     label: 'Market Analytics',  path: '/admin/analytics' },
 ];

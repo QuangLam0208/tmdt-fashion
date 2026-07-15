@@ -52,4 +52,8 @@ public interface OrderItemRepository extends JpaRepository<OrderItem, Long> {
             "GROUP BY oi.productVariant.product.id, oi.productName " +
             "ORDER BY SUM(oi.quantity) DESC")
     List<Object[]> findTopSellingProducts();
+
+    // ANALYTICS: Doanh thu theo danh mục
+    @Query("SELECT p.category.name, SUM(oi.quantity * oi.price) FROM OrderItem oi JOIN oi.productVariant pv JOIN pv.product p WHERE oi.status IN ('DELIVERED', 'COMPLETED') GROUP BY p.category.name")
+    List<Object[]> findCategoryRevenue();
 }
