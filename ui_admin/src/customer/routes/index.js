@@ -15,6 +15,7 @@ import VerifyEmailPage    from '../pages/auth/VerifyEmailPage';
 // ── Shop (public)
 import LandingPage       from '../pages/landing/LandingPage';
 import ProductListPage   from '../pages/shop/ProductListPage';
+import AboutPage         from '../pages/landing/AboutPage';
 import ProductDetailPage from '../pages/shop/ProductDetailPage';
 import CategoryPage      from '../pages/shop/CategoryPage';
 import WishlistPage      from '../pages/shop/WishlistPage';
@@ -52,6 +53,7 @@ const CustomerRoutes = () => (
     <Route element={<CustomerLayout />}>
       {/* Public */}
       <Route index              element={<LandingPage />} />
+      <Route path="about"         element={<AboutPage />} />
       <Route path="shop"        element={<ProductListPage />} />
       <Route path="shop/:id"    element={<ProductDetailPage />} />
       <Route path="category/:id" element={<CategoryPage />} />
