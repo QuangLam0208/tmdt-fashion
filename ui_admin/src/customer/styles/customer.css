@@ -218,3 +218,45 @@
 .custom-quantity-input input {
   text-align: center !important;
 }
+
+/* ═══════════════════════════════════════════
+   Navbar Responsive
+═══════════════════════════════════════════ */
+
+/* Nút hamburger: ẩn trên desktop, hiện trên mobile */
+.navbar-hamburger { display: none !important; }
+
+/* Nav desktop: hiện trên desktop, ẩn trên mobile */
+.navbar-desktop-nav {
+  display: flex;
+  gap: 28px;
+}
+
+/* Ẩn tên user trên màn hình nhỏ */
+.navbar-username { display: inline; }
+
+@media (max-width: 768px) {
+  .navbar-hamburger { display: inline-flex !important; }
+  .navbar-desktop-nav { display: none; }
+  .navbar-username { display: none; }
+}
+
+/* ═══════════════════════════════════════════
+   Global Mobile Fixes
+═══════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; }
+body { overflow-x: hidden; }
+
+@media (max-width: 768px) {
+  .c-section-title { font-size: 1.5rem; }
+  .landing-section { padding: var(--space-xl) 0; }
+
+  /* Ant Design Table scroll ngang trên mobile */
+  .ant-table-wrapper { overflow-x: auto; }
+  .ant-table { min-width: 500px; }
+}
+
+@media (max-width: 480px) {
+  .c-section-title { font-size: 1.25rem; }
+  .c-btn-primary, .c-btn-outline { padding: 10px 20px; font-size: 0.85rem; }
+}

@@ -231,6 +231,7 @@ const CheckoutPage = () => {
                 columns={columns}
                 rowKey={(record) => record.cartItemId ?? record.itemId ?? record.id}
                 pagination={false}
+                scroll={{ x: 'max-content' }}
               />
             </Card>
           </Col>
