@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Result, Button, Card, Typography, Descriptions } from 'antd';
 import { useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { formatCurrency } from '../../../shared/utils/formatters';
+import ReactGA from 'react-ga4';
 
 const { Text } = Typography;
 
@@ -24,6 +25,18 @@ const OrderConfirmPage = () => {
 
   const orderData = location.state;
 
+  // --- GẮN SỰ KIỆN PURCHASE (GA4) ---
+  useEffect(() => {
+    if (orderData && orderData.status !== 'PAYMENT_FAILED') {
+      ReactGA.event("purchase", {
+        transaction_id: orderData.orderId,
+        value: orderData.totalAmount,
+        currency: "VND"
+      });
+    }
+  }, [orderData]);
+  // ----------------------------------
+
   if (!orderData) {
     return <Navigate to="/" replace />;
   }
@@ -40,18 +53,18 @@ const OrderConfirmPage = () => {
             title="Đặt hàng thành công!"
             subTitle={orderData.message || "Cảm ơn bạn đã tin tưởng và mua sắm tại hệ thống của chúng tôi."}
             extra={[
-              <Button 
-                key="orders" 
-                type="primary" 
-                size="large" 
+              <Button
+                key="orders"
+                type="primary"
+                size="large"
                 style={{ background: '#1a1a1a', borderColor: '#1a1a1a', borderRadius: 8 }}
                 onClick={() => navigate('/account/orders')}
               >
                 Xem đơn hàng
               </Button>,
-              <Button 
-                key="home" 
-                size="large" 
+              <Button
+                key="home"
+                size="large"
                 style={{ borderRadius: 8 }}
                 onClick={() => navigate('/')}
               >

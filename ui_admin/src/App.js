@@ -3,6 +3,8 @@ import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ConfigProvider } from 'antd';
 import viVN from 'antd/locale/vi_VN';
+import { HelmetProvider } from 'react-helmet-async';
+import ReactGA from 'react-ga4';
 
 // Admin
 import { AuthProvider } from './admin/context/AuthContext';
@@ -13,6 +15,8 @@ import { CustomerAuthProvider } from './customer/context/CustomerAuthContext';
 import { CartProvider } from './customer/context/CartContext';
 import { WishlistProvider } from './customer/context/WishlistContext';
 import CustomerRoutes from './customer/routes';
+
+ReactGA.initialize("G-15262187837");
 
 /**
  * App — root component
@@ -25,8 +29,9 @@ import CustomerRoutes from './customer/routes';
  */
 const App = () => {
   return (
-    <ConfigProvider locale={viVN}>
-      <BrowserRouter>
+    <HelmetProvider>
+      <ConfigProvider locale={viVN}>
+        <BrowserRouter>
         <Routes>
           {/* ── ADMIN — toàn bộ /admin/* ── */}
           <Route
@@ -54,6 +59,7 @@ const App = () => {
         </Routes>
       </BrowserRouter>
     </ConfigProvider>
+    </HelmetProvider>
   );
 };
 

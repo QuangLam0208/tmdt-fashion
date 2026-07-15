@@ -258,6 +258,28 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<ProductSummaryResponseDTO> getRecommendations(Long userId) {
+        List<Product> recommendedProducts = new ArrayList<>();
+        
+        if (userId != null) {
+            List<Long> topCategories = productRepository.findTopCategoryIdsByUserId(userId, PageRequest.of(0, 2));
+            if (!topCategories.isEmpty()) {
+                recommendedProducts = productRepository.findRecommendedProducts(topCategories, userId, PageRequest.of(0, 8));
+            }
+        }
+        
+        if (recommendedProducts.isEmpty() || recommendedProducts.size() < 4) {
+            recommendedProducts = productRepository.findTopSellingProducts(PageRequest.of(0, 8));
+        }
+
+        return recommendedProducts.stream()
+                .limit(8)
+                .map(this::mapToSummaryDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Override
     @Transactional
     public ProductDetailResponseDTO createProduct(CreateProductRequestDTO dto) {
         // Tìm Category từ ID
