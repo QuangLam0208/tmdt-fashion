@@ -65,5 +65,15 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     // Lấy danh sách các danh mục duy nhất (giữ tương thích cũ)
     @Query("SELECT DISTINCT c.name FROM Product p JOIN p.category c")
     List<String> findDistinctCategories();
+
+    // Recommendation queries
+    @Query("SELECT p.category.id FROM RecentlyViewedItem r JOIN r.product p WHERE r.user.id = :userId GROUP BY p.category.id ORDER BY COUNT(r.id) DESC")
+    List<Long> findTopCategoryIdsByUserId(@Param("userId") Long userId, Pageable pageable);
+
+    @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.images i WHERE p.category.id IN :categoryIds AND p.status = 'ACTIVE' AND p.id NOT IN (SELECT r.product.id FROM RecentlyViewedItem r WHERE r.user.id = :userId)")
+    List<Product> findRecommendedProducts(@Param("categoryIds") List<Long> categoryIds, @Param("userId") Long userId, Pageable pageable);
+
+    @Query("SELECT p FROM Product p LEFT JOIN FETCH p.images i WHERE p.status = 'ACTIVE' ORDER BY p.id DESC")
+    List<Product> findTopSellingProducts(Pageable pageable);
 }
 

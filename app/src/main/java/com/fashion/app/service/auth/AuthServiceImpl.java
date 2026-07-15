@@ -333,7 +333,8 @@ public class AuthServiceImpl implements AuthService {
     }
 
     private String capitalizeName(String name) {
-        if (name == null || name.isBlank()) return "";
+        if (name == null || name.isBlank())
+            return "";
         String[] words = name.toLowerCase().split("\\s+");
         StringBuilder sb = new StringBuilder();
         for (String word : words) {

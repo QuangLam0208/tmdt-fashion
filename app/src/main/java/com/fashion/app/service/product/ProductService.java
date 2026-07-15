@@ -24,6 +24,10 @@ public interface ProductService {
     // Sản phẩm liên quan
     List<ProductSummaryResponseDTO> getRelatedProducts(Long productId, int limit);
 
+    // Sản phẩm gợi ý (Recommendation System)
+    List<ProductSummaryResponseDTO> getRecommendations(Long userId);
+
+
     // CRUD (Admin)
     ProductDetailResponseDTO createProduct(CreateProductRequestDTO dto);
     ProductDetailResponseDTO updateProduct(Long productId, UpdateProductRequestDTO dto);
