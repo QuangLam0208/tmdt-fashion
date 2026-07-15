@@ -21,6 +21,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.fashion.app.util.HtmlSanitizer;
 
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -39,6 +40,7 @@ public class ProductServiceImpl implements ProductService {
     private final ProductCleanupRepository cleanupRepository;
     private final ReviewRepository reviewRepository;
     private final OrderItemRepository orderItemRepository;
+    private final HtmlSanitizer htmlSanitizer;
 
     // Helper: Lấy tên danh mục an toàn (null-safe)
     private String getCategoryName(Product product) {
@@ -256,6 +258,28 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<ProductSummaryResponseDTO> getRecommendations(Long userId) {
+        List<Product> recommendedProducts = new ArrayList<>();
+        
+        if (userId != null) {
+            List<Long> topCategories = productRepository.findTopCategoryIdsByUserId(userId, PageRequest.of(0, 2));
+            if (!topCategories.isEmpty()) {
+                recommendedProducts = productRepository.findRecommendedProducts(topCategories, userId, PageRequest.of(0, 8));
+            }
+        }
+        
+        if (recommendedProducts.isEmpty() || recommendedProducts.size() < 4) {
+            recommendedProducts = productRepository.findTopSellingProducts(PageRequest.of(0, 8));
+        }
+
+        return recommendedProducts.stream()
+                .limit(8)
+                .map(this::mapToSummaryDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Override
     @Transactional
     public ProductDetailResponseDTO createProduct(CreateProductRequestDTO dto) {
         // Tìm Category từ ID
@@ -265,7 +289,7 @@ public class ProductServiceImpl implements ProductService {
         Product product = Product.builder()
                 .name(dto.getName())
                 .category(category)
-                .description(dto.getDescription())
+                .description(htmlSanitizer.sanitizeDescription(dto.getDescription()))
                 .status(ProductStatus.ACTIVE)
                 .build();
 
@@ -315,7 +339,7 @@ public class ProductServiceImpl implements ProductService {
         }
 
         if (dto.getDescription() != null)
-            product.setDescription(dto.getDescription());
+            product.setDescription(htmlSanitizer.sanitizeDescription(dto.getDescription()));
 
         if (dto.getStatus() != null)
             product.setStatus(dto.getStatus());
