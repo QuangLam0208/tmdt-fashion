@@ -16,6 +16,7 @@ import userRoutes      from './userRoutes';
 import couponRoutes    from './couponRoutes';
 import RevenueReportPage from '../pages/reports/RevenueReportPage';
 import POSPage from '../pages/pos/POSPage';
+import MarketAnalyticsDashboard from '../pages/analytics/MarketAnalyticsDashboard';
 
 /**
  * AdminRoutes — nhận /*  từ App.js (path="/admin/*")
@@ -42,6 +43,7 @@ const AdminRoutes = () => (
         {couponRoutes}
         <Route path="reports" element={<RevenueReportPage />} />
         <Route path="pos" element={<POSPage />} />
+        <Route path="analytics" element={<MarketAnalyticsDashboard />} />
       </Route>
     </Route>
 
