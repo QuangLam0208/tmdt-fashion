@@ -16,7 +16,7 @@ import { CartProvider } from './customer/context/CartContext';
 import { WishlistProvider } from './customer/context/WishlistContext';
 import CustomerRoutes from './customer/routes';
 
-ReactGA.initialize("G-15262187837");
+ReactGA.initialize("G-TY0WKL51S9");
 
 /**
  * App — root component
