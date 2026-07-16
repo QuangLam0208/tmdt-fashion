@@ -60,7 +60,7 @@ class OrderExpirationTaskTest {
     @Test
     @DisplayName("Case: tiền đã trừ nhưng mất kết nối — đối soát MoMo xác nhận đã thanh toán thì KHÔNG hủy đơn")
     void cleanupExpiredOrders_MomoOrderReconciledAsPaid_SkipsExpiration() {
-        when(orderRepository.findByStatusAndOrderDateBefore(eq(OrderStatus.PENDING_PAYMENT), any(Date.class)))
+        when(orderRepository.findByStatusAndOrderDateBefore(eq(OrderStatus.PENDING_PAYMENT), any(Date.class).toInstant()))
                 .thenReturn(List.of(momoOrder));
         when(paymentService.reconcilePendingMomoPayment(1L)).thenReturn(true);
 
@@ -75,7 +75,7 @@ class OrderExpirationTaskTest {
     @Test
     @DisplayName("Đơn MoMo đối soát vẫn CHƯA thanh toán thì tiếp tục hủy như bình thường")
     void cleanupExpiredOrders_MomoOrderNotReconciled_ProceedsToExpire() {
-        when(orderRepository.findByStatusAndOrderDateBefore(eq(OrderStatus.PENDING_PAYMENT), any(Date.class)))
+        when(orderRepository.findByStatusAndOrderDateBefore(eq(OrderStatus.PENDING_PAYMENT), any(Date.class).toInstant()))
                 .thenReturn(List.of(momoOrder));
         when(paymentService.reconcilePendingMomoPayment(1L)).thenReturn(false);
 
@@ -98,7 +98,7 @@ class OrderExpirationTaskTest {
         codItem.setStatus(OrderStatus.PENDING_PAYMENT);
         codOrder.setOrderItems(List.of(codItem));
 
-        when(orderRepository.findByStatusAndOrderDateBefore(eq(OrderStatus.PENDING_PAYMENT), any(Date.class)))
+        when(orderRepository.findByStatusAndOrderDateBefore(eq(OrderStatus.PENDING_PAYMENT), any(Date.class).toInstant()))
                 .thenReturn(List.of(codOrder));
 
         orderExpirationTask.cleanupExpiredOrders();

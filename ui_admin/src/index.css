@@ -1,5 +1,9 @@
 /* src/index.css — Global Reset & Base */
 
+/* ─── Google Fonts (preload để tăng Lighthouse) ──────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Lato:wght@400;600;700&family=Playfair+Display:wght@600;700&display=swap');
+
+
 *,
 *::before,
 *::after {
@@ -21,6 +25,7 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden; /* Ngăn scroll ngang trên mobile */
 }
 
 a {
@@ -68,10 +73,4 @@ input, textarea, select {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #a8843a;
-}
-
-/* ── Scroll-reveal utility (dùng bởi AboutPage IntersectionObserver) ── */
-[data-reveal].revealed {
-  opacity: 1 !important;
-  transform: none !important;
 }
