@@ -143,7 +143,8 @@ public class SecurityConfig {
                 "http://localhost:3000",  // ReactJS dev server
                 "http://localhost:5173",   // Vite dev server
                 "https://tmdt-fashion-ssl8-nine.vercel.app",
-                "https://tmdt-fashion.onrender.com"
+                "https://tmdt-fashion.onrender.com",
+                "https://tmdt-fashion.vercel.app"
         ));
 
         // Cho phép tất cả HTTP methods
