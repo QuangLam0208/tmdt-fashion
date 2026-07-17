@@ -65,7 +65,7 @@ class PaymentServiceImplTest {
     private UserRepository userRepository;
 
     @Mock
-    private MomoService momoService;
+    private VNPayService vnPayService;
 
     @Mock
     private OrderManagementService orderManagementService;
@@ -93,33 +93,32 @@ class PaymentServiceImplTest {
     }
 
     @Test
-    void processMomoIPN_SignatureInvalid_ThrowsException() {
+    void processVNPayIPN_SignatureInvalid_ThrowsException() {
         Map<String, Object> payload = new HashMap<>();
-        payload.put("orderId", 1L);
-        payload.put("resultCode", 0);
+        payload.put("vnp_TxnRef", "1_1000");
+        payload.put("vnp_ResponseCode", "00");
 
-        when(momoService.verifySignature(anyMap())).thenReturn(false);
+        when(vnPayService.verifySignature(anyMap())).thenReturn(false);
 
-        Exception exception = assertThrows(RuntimeException.class, () -> paymentService.processMomoIPN(payload));
-        assertEquals("Chữ ký MoMo không hợp lệ!", exception.getMessage());
+        Exception exception = assertThrows(RuntimeException.class, () -> paymentService.processVNPayIPN(payload));
+        assertEquals("Chữ ký VNPay không hợp lệ!", exception.getMessage());
 
         verify(orderRepository, never()).findById(anyLong());
     }
 
     @Test
-    void processMomoIPN_SignatureValid_Success_UpdatesStatusToPaid() {
+    void processVNPayIPN_SignatureValid_Success_UpdatesStatusToPaid() {
         Map<String, Object> payload = new HashMap<>();
-        payload.put("orderId", 1L);
-        payload.put("resultCode", 0);
-        payload.put("transId", "trans-001");
-        payload.put("requestId", "req-001");
+        payload.put("vnp_TxnRef", "1_1000");
+        payload.put("vnp_ResponseCode", "00");
+        payload.put("vnp_TransactionNo", "trans-001");
 
-        when(momoService.verifySignature(anyMap())).thenReturn(true);
-        when(paymentTransactionRepository.existsByProviderAndTransId(PaymentProvider.MOMO, "trans-001")).thenReturn(false);
-        when(paymentTransactionRepository.findByProviderAndRequestId(PaymentProvider.MOMO, "req-001")).thenReturn(Optional.empty());
+        when(vnPayService.verifySignature(anyMap())).thenReturn(true);
+        when(paymentTransactionRepository.existsByProviderAndTransId(PaymentProvider.VNPAY, "trans-001")).thenReturn(false);
+        when(paymentTransactionRepository.findByProviderAndRequestId(PaymentProvider.VNPAY, "1_1000")).thenReturn(Optional.empty());
         when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
 
-        paymentService.processMomoIPN(payload);
+        paymentService.processVNPayIPN(payload);
 
         assertEquals(OrderStatus.PAID, mockOrderItem.getStatus());
         verify(orderItemRepository, times(1)).save(mockOrderItem);
@@ -129,19 +128,18 @@ class PaymentServiceImplTest {
     }
 
     @Test
-    void processMomoIPN_SignatureValid_Failed_UpdatesStatusToPaymentFailed() {
+    void processVNPayIPN_SignatureValid_Failed_UpdatesStatusToPaymentFailed() {
         Map<String, Object> payload = new HashMap<>();
-        payload.put("orderId", 1L);
-        payload.put("resultCode", 1006);
-        payload.put("transId", "trans-002");
-        payload.put("requestId", "req-002");
+        payload.put("vnp_TxnRef", "1_1000");
+        payload.put("vnp_ResponseCode", "24");
+        payload.put("vnp_TransactionNo", "trans-002");
 
-        when(momoService.verifySignature(anyMap())).thenReturn(true);
-        when(paymentTransactionRepository.existsByProviderAndTransId(PaymentProvider.MOMO, "trans-002")).thenReturn(false);
-        when(paymentTransactionRepository.findByProviderAndRequestId(PaymentProvider.MOMO, "req-002")).thenReturn(Optional.empty());
+        when(vnPayService.verifySignature(anyMap())).thenReturn(true);
+        when(paymentTransactionRepository.existsByProviderAndTransId(PaymentProvider.VNPAY, "trans-002")).thenReturn(false);
+        when(paymentTransactionRepository.findByProviderAndRequestId(PaymentProvider.VNPAY, "1_1000")).thenReturn(Optional.empty());
         when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
 
-        paymentService.processMomoIPN(payload);
+        paymentService.processVNPayIPN(payload);
 
         assertEquals(OrderStatus.PAYMENT_FAILED, mockOrderItem.getStatus());
         verify(orderItemRepository, times(1)).save(mockOrderItem);
@@ -150,18 +148,17 @@ class PaymentServiceImplTest {
     }
 
     @Test
-    void processMomoIPN_DuplicateTransId_IsIdempotent_DoesNotReprocess() {
+    void processVNPayIPN_DuplicateTransId_IsIdempotent_DoesNotReprocess() {
         Map<String, Object> payload = new HashMap<>();
-        payload.put("orderId", 1L);
-        payload.put("resultCode", 0);
-        payload.put("transId", "trans-003");
-        payload.put("requestId", "req-003");
+        payload.put("vnp_TxnRef", "1_1000");
+        payload.put("vnp_ResponseCode", "00");
+        payload.put("vnp_TransactionNo", "trans-003");
 
-        when(momoService.verifySignature(anyMap())).thenReturn(true);
-        // Giả lập MoMo gọi lại IPN cho transId đã xử lý trước đó (retry chuẩn của cổng thanh toán)
-        when(paymentTransactionRepository.existsByProviderAndTransId(PaymentProvider.MOMO, "trans-003")).thenReturn(true);
+        when(vnPayService.verifySignature(anyMap())).thenReturn(true);
+        // Giả lập VNPay gọi lại IPN cho transId đã xử lý trước đó (retry chuẩn của cổng thanh toán)
+        when(paymentTransactionRepository.existsByProviderAndTransId(PaymentProvider.VNPAY, "trans-003")).thenReturn(true);
 
-        paymentService.processMomoIPN(payload);
+        paymentService.processVNPayIPN(payload);
 
         // Không được xử lý lại: không tìm Order, không lưu trạng thái, không đồng bộ order
         verify(orderRepository, never()).findById(anyLong());
@@ -171,33 +168,32 @@ class PaymentServiceImplTest {
     }
 
     @Test
-    void processMomoReturn_SignatureInvalid_ReturnsFailed() {
+    void processVNPayReturn_SignatureInvalid_ReturnsFailed() {
         Map<String, String> payload = new HashMap<>();
-        payload.put("orderId", "1");
-        payload.put("resultCode", "0");
+        payload.put("vnp_TxnRef", "1_1000");
+        payload.put("vnp_ResponseCode", "00");
 
-        when(momoService.verifySignature(anyMap())).thenReturn(false);
+        when(vnPayService.verifySignature(anyMap())).thenReturn(false);
 
-        String result = paymentService.processMomoReturn(payload);
+        String result = paymentService.processVNPayReturn(payload);
 
         assertEquals("failed", result);
         verify(orderRepository, never()).findById(anyLong());
     }
 
     @Test
-    void processMomoReturn_SignatureValid_Success_ReturnsSuccess() {
+    void processVNPayReturn_SignatureValid_Success_ReturnsSuccess() {
         Map<String, String> payload = new HashMap<>();
-        payload.put("orderId", "1");
-        payload.put("resultCode", "0");
-        payload.put("transId", "trans-004");
-        payload.put("requestId", "req-004");
+        payload.put("vnp_TxnRef", "1_1000");
+        payload.put("vnp_ResponseCode", "00");
+        payload.put("vnp_TransactionNo", "trans-004");
 
-        when(momoService.verifySignature(anyMap())).thenReturn(true);
-        when(paymentTransactionRepository.existsByProviderAndTransId(PaymentProvider.MOMO, "trans-004")).thenReturn(false);
-        when(paymentTransactionRepository.findByProviderAndRequestId(PaymentProvider.MOMO, "req-004")).thenReturn(Optional.empty());
+        when(vnPayService.verifySignature(anyMap())).thenReturn(true);
+        when(paymentTransactionRepository.existsByProviderAndTransId(PaymentProvider.VNPAY, "trans-004")).thenReturn(false);
+        when(paymentTransactionRepository.findByProviderAndRequestId(PaymentProvider.VNPAY, "1_1000")).thenReturn(Optional.empty());
         when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
 
-        String result = paymentService.processMomoReturn(payload);
+        String result = paymentService.processVNPayReturn(payload);
 
         assertEquals("success", result);
         assertEquals(OrderStatus.PAID, mockOrderItem.getStatus());
@@ -210,7 +206,7 @@ class PaymentServiceImplTest {
      * (nếu còn đủ tồn kho) thay vì im lặng bỏ qua, và bắt buộc cảnh báo admin.
      */
     @Test
-    void processMomoIPN_LatePaymentAfterExpiry_WithStock_RecoversOrderAndNotifiesAdmin() {
+    void processVNPayIPN_LatePaymentAfterExpiry_WithStock_RecoversOrderAndNotifiesAdmin() {
         ProductVariant variant = ProductVariant.builder().id(500L).stockQuantity(5L).build();
         mockOrderItem.setStatus(OrderStatus.PAYMENT_EXPIRED);
         mockOrderItem.setQuantity(1L);
@@ -218,20 +214,19 @@ class PaymentServiceImplTest {
         mockOrder.setStatus(OrderStatus.PAYMENT_EXPIRED);
 
         Map<String, Object> payload = new HashMap<>();
-        payload.put("orderId", 1L);
-        payload.put("resultCode", 0);
-        payload.put("transId", "trans-late-001");
-        payload.put("requestId", "req-late-001");
+        payload.put("vnp_TxnRef", "1_1000");
+        payload.put("vnp_ResponseCode", "00");
+        payload.put("vnp_TransactionNo", "trans-late-001");
 
         User admin = User.builder().id(999L).role(Role.ADMIN).build();
 
-        when(momoService.verifySignature(anyMap())).thenReturn(true);
-        when(paymentTransactionRepository.existsByProviderAndTransId(PaymentProvider.MOMO, "trans-late-001")).thenReturn(false);
-        when(paymentTransactionRepository.findByProviderAndRequestId(PaymentProvider.MOMO, "req-late-001")).thenReturn(Optional.empty());
+        when(vnPayService.verifySignature(anyMap())).thenReturn(true);
+        when(paymentTransactionRepository.existsByProviderAndTransId(PaymentProvider.VNPAY, "trans-late-001")).thenReturn(false);
+        when(paymentTransactionRepository.findByProviderAndRequestId(PaymentProvider.VNPAY, "1_1000")).thenReturn(Optional.empty());
         when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
         when(userRepository.findByRole(eq(Role.ADMIN), any())).thenReturn(new PageImpl<>(List.of(admin)));
 
-        paymentService.processMomoIPN(payload);
+        paymentService.processVNPayIPN(payload);
 
         assertEquals(OrderStatus.PAID, mockOrderItem.getStatus());
         assertEquals(OrderStatus.PAID, mockOrder.getStatus());
@@ -242,7 +237,7 @@ class PaymentServiceImplTest {
     }
 
     @Test
-    void processMomoIPN_LatePaymentAfterExpiry_OutOfStock_FlagsUrgentRefundAndAlertsAdmin() {
+    void processVNPayIPN_LatePaymentAfterExpiry_OutOfStock_FlagsUrgentRefundAndAlertsAdmin() {
         ProductVariant variant = ProductVariant.builder().id(501L).stockQuantity(0L).build();
         mockOrderItem.setStatus(OrderStatus.PAYMENT_EXPIRED);
         mockOrderItem.setQuantity(1L);
@@ -250,20 +245,19 @@ class PaymentServiceImplTest {
         mockOrder.setStatus(OrderStatus.CANCELLED);
 
         Map<String, Object> payload = new HashMap<>();
-        payload.put("orderId", 1L);
-        payload.put("resultCode", 0);
-        payload.put("transId", "trans-late-002");
-        payload.put("requestId", "req-late-002");
+        payload.put("vnp_TxnRef", "1_1000");
+        payload.put("vnp_ResponseCode", "00");
+        payload.put("vnp_TransactionNo", "trans-late-002");
 
         User admin = User.builder().id(999L).role(Role.ADMIN).build();
 
-        when(momoService.verifySignature(anyMap())).thenReturn(true);
-        when(paymentTransactionRepository.existsByProviderAndTransId(PaymentProvider.MOMO, "trans-late-002")).thenReturn(false);
-        when(paymentTransactionRepository.findByProviderAndRequestId(PaymentProvider.MOMO, "req-late-002")).thenReturn(Optional.empty());
+        when(vnPayService.verifySignature(anyMap())).thenReturn(true);
+        when(paymentTransactionRepository.existsByProviderAndTransId(PaymentProvider.VNPAY, "trans-late-002")).thenReturn(false);
+        when(paymentTransactionRepository.findByProviderAndRequestId(PaymentProvider.VNPAY, "1_1000")).thenReturn(Optional.empty());
         when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
         when(userRepository.findByRole(eq(Role.ADMIN), any())).thenReturn(new PageImpl<>(List.of(admin)));
 
-        paymentService.processMomoIPN(payload);
+        paymentService.processVNPayIPN(payload);
 
         // Không đủ hàng: KHÔNG được tự ý đánh dấu PAID, phải để hoàn tiền thủ công
         assertEquals(OrderStatus.PAYMENT_EXPIRED, mockOrderItem.getStatus());
@@ -274,18 +268,18 @@ class PaymentServiceImplTest {
     }
 
     @Test
-    void recreateMomoPayment_OrderNotFound_ThrowsException() {
+    void recreateVNPayPayment_OrderNotFound_ThrowsException() {
         try (MockedStatic<SecurityUtils> mockedSecurityUtils = mockStatic(SecurityUtils.class)) {
             mockedSecurityUtils.when(SecurityUtils::getAuthenticatedUserId).thenReturn(1L);
             when(orderRepository.findById(1L)).thenReturn(Optional.empty());
 
-            Exception exception = assertThrows(ResourceNotFoundException.class, () -> paymentService.recreateMomoPayment(1L));
+            Exception exception = assertThrows(ResourceNotFoundException.class, () -> paymentService.recreateVNPayPayment(1L));
             assertEquals("Đơn hàng không tồn tại!", exception.getMessage());
         }
     }
 
     @Test
-    void recreateMomoPayment_NotOwner_ThrowsException() {
+    void recreateVNPayPayment_NotOwner_ThrowsException() {
         try (MockedStatic<SecurityUtils> mockedSecurityUtils = mockStatic(SecurityUtils.class)) {
             mockedSecurityUtils.when(SecurityUtils::getAuthenticatedUserId).thenReturn(2L);
             User user = new User();
@@ -293,13 +287,13 @@ class PaymentServiceImplTest {
             mockOrder.setUser(user);
             when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
 
-            Exception exception = assertThrows(AccessDeniedException.class, () -> paymentService.recreateMomoPayment(1L));
+            Exception exception = assertThrows(AccessDeniedException.class, () -> paymentService.recreateVNPayPayment(1L));
             assertEquals("Bạn không có quyền truy cập đơn hàng này!", exception.getMessage());
         }
     }
 
     @Test
-    void recreateMomoPayment_InvalidStatus_ThrowsException() {
+    void recreateVNPayPayment_InvalidStatus_ThrowsException() {
         try (MockedStatic<SecurityUtils> mockedSecurityUtils = mockStatic(SecurityUtils.class)) {
             mockedSecurityUtils.when(SecurityUtils::getAuthenticatedUserId).thenReturn(1L);
             User user = new User();
@@ -308,26 +302,26 @@ class PaymentServiceImplTest {
             mockOrder.setStatus(OrderStatus.PAID);
             when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
 
-            Exception exception = assertThrows(BadRequestException.class, () -> paymentService.recreateMomoPayment(1L));
+            Exception exception = assertThrows(BadRequestException.class, () -> paymentService.recreateVNPayPayment(1L));
             assertEquals("Đơn hàng không đủ điều kiện để thanh toán lại", exception.getMessage());
         }
     }
 
     @Test
-    void recreateMomoPayment_Success_ReturnsPaymentUrl() {
+    void recreateVNPayPayment_Success_ReturnsPaymentUrl() {
         try (MockedStatic<SecurityUtils> mockedSecurityUtils = mockStatic(SecurityUtils.class)) {
             mockedSecurityUtils.when(SecurityUtils::getAuthenticatedUserId).thenReturn(1L);
             User user = new User();
             user.setId(1L);
             mockOrder.setUser(user);
             mockOrder.setStatus(OrderStatus.PENDING_PAYMENT);
-            mockOrder.setPaymentMethod(PaymentMethod.MOMO);
+            mockOrder.setPaymentMethod(PaymentMethod.VNPAY);
             mockOrder.setTotalAmount(100000.0);
 
             when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
-            when(momoService.createPaymentUrl(1L, 100000.0)).thenReturn("http://mock-payment-url");
+            when(vnPayService.createPaymentUrl(1L, 100000.0)).thenReturn("http://mock-payment-url");
 
-            PaymentResponseDTO result = paymentService.recreateMomoPayment(1L);
+            PaymentResponseDTO result = paymentService.recreateVNPayPayment(1L);
 
             assertNotNull(result);
             assertEquals("SUCCESS", result.getStatus());
@@ -337,62 +331,62 @@ class PaymentServiceImplTest {
     }
 
     /**
-     * Đối soát chủ động (dùng bởi scheduler trước khi hủy đơn quá hạn): nếu MoMo xác nhận đã
+     * Đối soát chủ động (dùng bởi scheduler trước khi hủy đơn quá hạn): nếu VNPay xác nhận đã
      * thanh toán thành công thì phải cập nhật đơn ngay, tránh hủy nhầm đơn đã thu tiền.
      */
     @Test
-    void reconcilePendingMomoPayment_GatewayConfirmsSuccess_UpdatesOrderAndReturnsTrue() {
+    void reconcilePendingVNPayPayment_GatewayConfirmsSuccess_UpdatesOrderAndReturnsTrue() {
         PaymentTransaction pendingTx = PaymentTransaction.builder()
                 .order(mockOrder)
-                .provider(PaymentProvider.MOMO)
-                .requestId("req-reconcile-001")
+                .provider(PaymentProvider.VNPAY)
+                .requestId("1_1000")
                 .amount(100000.0)
                 .status(PaymentTransactionStatus.PENDING)
                 .build();
 
         when(paymentTransactionRepository.findFirstByOrderIdAndProviderAndStatusOrderByCreatedAtDesc(
-                1L, PaymentProvider.MOMO, PaymentTransactionStatus.PENDING)).thenReturn(Optional.of(pendingTx));
-        when(momoService.queryTransaction(1L, "req-reconcile-001"))
-                .thenReturn(new MomoService.MomoQueryResult(0, "trans-reconcile-001", "Success", "{}"));
-        when(paymentTransactionRepository.existsByProviderAndTransId(PaymentProvider.MOMO, "trans-reconcile-001")).thenReturn(false);
-        when(paymentTransactionRepository.findByProviderAndRequestId(PaymentProvider.MOMO, "req-reconcile-001")).thenReturn(Optional.of(pendingTx));
+                1L, PaymentProvider.VNPAY, PaymentTransactionStatus.PENDING)).thenReturn(Optional.of(pendingTx));
+        when(vnPayService.queryTransaction(1L, "1_1000"))
+                .thenReturn(new VNPayService.VNPayQueryResult("00", "00", "trans-reconcile-001", "Success", "{}"));
+        when(paymentTransactionRepository.existsByProviderAndTransId(PaymentProvider.VNPAY, "trans-reconcile-001")).thenReturn(false);
+        when(paymentTransactionRepository.findByProviderAndRequestId(PaymentProvider.VNPAY, "1_1000")).thenReturn(Optional.of(pendingTx));
         when(orderRepository.findById(1L)).thenReturn(Optional.of(mockOrder));
 
-        boolean result = paymentService.reconcilePendingMomoPayment(1L);
+        boolean result = paymentService.reconcilePendingVNPayPayment(1L);
 
         assertTrue(result);
         assertEquals(OrderStatus.PAID, mockOrderItem.getStatus());
     }
 
     @Test
-    void reconcilePendingMomoPayment_GatewayNotYetSuccess_ReturnsFalse() {
+    void reconcilePendingVNPayPayment_GatewayNotYetSuccess_ReturnsFalse() {
         PaymentTransaction pendingTx = PaymentTransaction.builder()
                 .order(mockOrder)
-                .provider(PaymentProvider.MOMO)
-                .requestId("req-reconcile-002")
+                .provider(PaymentProvider.VNPAY)
+                .requestId("1_1001")
                 .amount(100000.0)
                 .status(PaymentTransactionStatus.PENDING)
                 .build();
 
         when(paymentTransactionRepository.findFirstByOrderIdAndProviderAndStatusOrderByCreatedAtDesc(
-                1L, PaymentProvider.MOMO, PaymentTransactionStatus.PENDING)).thenReturn(Optional.of(pendingTx));
-        when(momoService.queryTransaction(1L, "req-reconcile-002"))
-                .thenReturn(new MomoService.MomoQueryResult(1006, null, "Transaction not found", "{}"));
+                1L, PaymentProvider.VNPAY, PaymentTransactionStatus.PENDING)).thenReturn(Optional.of(pendingTx));
+        when(vnPayService.queryTransaction(1L, "1_1001"))
+                .thenReturn(new VNPayService.VNPayQueryResult("01", null, null, "Transaction not found", "{}"));
 
-        boolean result = paymentService.reconcilePendingMomoPayment(1L);
+        boolean result = paymentService.reconcilePendingVNPayPayment(1L);
 
         assertFalse(result);
         verify(orderRepository, never()).findById(anyLong());
     }
 
     @Test
-    void reconcilePendingMomoPayment_NoPendingTransaction_ReturnsFalse() {
+    void reconcilePendingVNPayPayment_NoPendingTransaction_ReturnsFalse() {
         when(paymentTransactionRepository.findFirstByOrderIdAndProviderAndStatusOrderByCreatedAtDesc(
-                1L, PaymentProvider.MOMO, PaymentTransactionStatus.PENDING)).thenReturn(Optional.empty());
+                1L, PaymentProvider.VNPAY, PaymentTransactionStatus.PENDING)).thenReturn(Optional.empty());
 
-        boolean result = paymentService.reconcilePendingMomoPayment(1L);
+        boolean result = paymentService.reconcilePendingVNPayPayment(1L);
 
         assertFalse(result);
-        verify(momoService, never()).queryTransaction(anyLong(), anyString());
+        verify(vnPayService, never()).queryTransaction(anyLong(), anyString());
     }
 }

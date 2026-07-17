@@ -8,7 +8,7 @@ import lombok.*;
 import java.time.Instant;
 
 /**
- * Ghi nhận từng giao dịch cổng thanh toán (MoMo) gắn với 1 Order.
+ * Ghi nhận từng giao dịch cổng thanh toán (VNPay) gắn với 1 Order.
  * Là chốt chặn idempotency: mỗi transId từ cổng thanh toán chỉ được xử lý (cộng dồn trạng thái đơn) đúng 1 lần,
  * kể cả khi IPN bị cổng thanh toán gọi lại nhiều lần (retry chuẩn khi không nhận được HTTP 200 kịp thời).
  */
