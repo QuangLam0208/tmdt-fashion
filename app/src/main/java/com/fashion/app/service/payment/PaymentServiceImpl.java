@@ -61,9 +61,7 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     @Transactional
-    public void processVNPayIPN(Map<String, Object> payload) {
-        Map<String, String> stringParams = new java.util.HashMap<>();
-        payload.forEach((k, v) -> stringParams.put(k, String.valueOf(v)));
+    public void processVNPayIPN(Map<String, String> stringParams) {
 
         if (!vnPayService.verifySignature(stringParams)) {
             throw new RuntimeException("Chữ ký VNPay không hợp lệ!");
@@ -74,7 +72,7 @@ public class PaymentServiceImpl implements PaymentService {
         String transId = stringParams.get("vnp_TransactionNo");
         String requestId = stringParams.get("vnp_TxnRef");
 
-        applyGatewayResult(orderId, transId, requestId, "00".equals(responseCode), "IPN: " + payload);
+        applyGatewayResult(orderId, transId, requestId, "00".equals(responseCode), "IPN: " + stringParams);
     }
 
     @Override

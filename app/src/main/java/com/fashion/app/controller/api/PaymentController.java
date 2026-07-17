@@ -40,14 +40,17 @@ public class PaymentController {
      * VNPay sẽ gọi vào endpoint này để cập nhật trạng thái giao dịch (thành công/thất bại) ngầm.
      * URL này phải được khai báo thủ công trong VNPay Merchant Admin (Sandbox), không truyền qua request tạo thanh toán.
      */
-    @PostMapping("/vnpay/ipn")
-    public ResponseEntity<String> processVNPayIPN(@RequestBody Map<String, Object> payload) {
+    @GetMapping("/vnpay/ipn")
+    public ResponseEntity<String> processVNPayIPN(
+            @RequestParam Map<String, String> allParams) {
         try {
-            log.info("Nhận được IPN từ VNPay: {}", payload);
-            paymentService.processVNPayIPN(payload);
+            log.info("Nhận được IPN từ VNPay: {}", allParams);
+
+            paymentService.processVNPayIPN(allParams);
+
             return ResponseEntity.ok("success");
         } catch (Exception e) {
-            log.error("Lỗi khi xử lý IPN VNPay: {}", e.getMessage(), e);
+            log.error("Lỗi khi xử lý IPN VNPay", e);
             return ResponseEntity.badRequest().body("Lỗi: " + e.getMessage());
         }
     }
