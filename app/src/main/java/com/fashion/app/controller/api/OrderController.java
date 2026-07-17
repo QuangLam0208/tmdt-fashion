@@ -76,7 +76,7 @@ public class OrderController {
         return ResponseEntity.ok(orderDetail);
     }
 
-    // THANH TOÁN LẠI (Cho đơn hàng MoMo chưa quá hạn)
+    // THANH TOÁN LẠI (Cho đơn hàng VNPay chưa quá hạn)
     @PostMapping("/{orderId}/retry-payment")
     public ResponseEntity<MessageResponseDTO> retryPayment(@PathVariable Long orderId) {
         Long userId = SecurityUtils.getAuthenticatedUserId();

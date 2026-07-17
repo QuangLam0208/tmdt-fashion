@@ -45,12 +45,12 @@ public class OrderExpirationTask {
         log.info("Phát hiện {} đơn hàng quá hạn thanh toán. Đang tiến hành hủy...", expiredOrders.size());
 
         for (Order order : expiredOrders) {
-            // Trước khi hủy, nếu đơn thanh toán qua MoMo thì chủ động tra cứu lại với cổng thanh toán
-            // để tránh case tiền đã trừ thành công nhưng IPN bị mất do mất kết nối (không hủy nhầm đơn đã trả tiền).
-            if (order.getPaymentMethod() == PaymentMethod.MOMO) {
-                boolean reconciledAsPaid = paymentService.reconcilePendingMomoPayment(order.getId());
+            // Trước khi hủy, nếu đơn thanh toán qua VNPay thì chủ động tra cứu lại với cổng thanh toán
+            // để tránh case tiền đã trừ thành công nhưng return/IPN bị mất do mất kết nối (không hủy nhầm đơn đã trả tiền).
+            if (order.getPaymentMethod() == PaymentMethod.VNPAY) {
+                boolean reconciledAsPaid = paymentService.reconcilePendingVNPayPayment(order.getId());
                 if (reconciledAsPaid) {
-                    log.warn("Đơn hàng #{} thực ra ĐÃ thanh toán MoMo thành công (phát hiện qua đối soát) — bỏ qua việc hủy do hết hạn.", order.getId());
+                    log.warn("Đơn hàng #{} thực ra ĐÃ thanh toán VNPay thành công (phát hiện qua đối soát) — bỏ qua việc hủy do hết hạn.", order.getId());
                     continue;
                 }
             }

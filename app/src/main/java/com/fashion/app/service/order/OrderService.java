@@ -28,7 +28,7 @@ public interface OrderService {
     // Hủy đơn hàng
     MessageResponseDTO cancelOrder(Long userId, Long orderId, CancelOrderRequestDTO dto);
 
-    // Thanh toán lại cho đơn MOMO
+    // Thanh toán lại cho đơn VNPAY
     String retryPayment(Long userId, Long orderId);
 
 

@@ -9,7 +9,7 @@ import com.fashion.app.model.*;
 import com.fashion.app.model.enums.*;
 import com.fashion.app.repository.*;
 import com.fashion.app.service.notification.NotificationService;
-import com.fashion.app.service.payment.MomoService;
+import com.fashion.app.service.payment.VNPayService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -38,7 +38,7 @@ public class OrderServiceImpl implements OrderService {
     private final CouponRepository couponRepository;
     private final UserRepository userRepository;
     private final UserCouponRepository userCouponRepository;
-    private final MomoService momoService;
+    private final VNPayService vnPayService;
     private final NotificationService notificationService;
 
     // ĐẶT HÀNG
@@ -156,10 +156,10 @@ public class OrderServiceImpl implements OrderService {
         // 6. Xóa các mục này khỏi giỏ hàng
         cartItemRepository.deleteAll(cartItems);
 
-        // 7. Xử lý Thanh toán trực tuyến (MoMo)
+        // 7. Xử lý Thanh toán trực tuyến (VNPay)
         String paymentUrl = null;
-        if (order.getPaymentMethod() == PaymentMethod.MOMO) {
-            paymentUrl = momoService.createPaymentUrl(order.getId(), order.getTotalAmount());
+        if (order.getPaymentMethod() == PaymentMethod.VNPAY) {
+            paymentUrl = vnPayService.createPaymentUrl(order.getId(), order.getTotalAmount());
         }
 
         // 7.5. Đánh dấu Coupon đã sử dụng (Nếu có)
@@ -185,7 +185,7 @@ public class OrderServiceImpl implements OrderService {
                 .totalAmount(order.getTotalAmount())
                 .status(order.getStatus())
                 .paymentUrl(paymentUrl)
-                .message(order.getPaymentMethod() == PaymentMethod.MOMO
+                .message(order.getPaymentMethod() == PaymentMethod.VNPAY
                         ? "Đơn hàng đã được khởi tạo. Vui lòng thanh toán trong vòng 10 phút."
                         : "Đặt hàng thành công! Đơn hàng của bạn đang chờ xác nhận.")
                 .build();
@@ -512,7 +512,7 @@ public class OrderServiceImpl implements OrderService {
             throw new BadRequestException("Yêu cầu thanh toán đã hết hạn (quá 10 phút)!");
         }
 
-        return momoService.createPaymentUrl(order.getId(), order.getTotalAmount());
+        return vnPayService.createPaymentUrl(order.getId(), order.getTotalAmount());
     }
 
     @Override
