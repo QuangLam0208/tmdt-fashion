@@ -163,7 +163,7 @@ const LandingPage = () => {
             {[
               { icon:'🚚', title:'Miễn phí vận chuyển', sub:'Cho đơn từ 500.000₫' },
               { icon:'↩️', title:'Đổi trả 30 ngày',     sub:'Không cần lý do' },
-              { icon:'💳', title:'Thanh toán an toàn',   sub:'COD, VNPay, MoMo' },
+              { icon:'💳', title:'Thanh toán an toàn',   sub:'COD, VNPay' },
               { icon:'🎁', title:'Ưu đãi thành viên',    sub:'Giảm thêm khi tích điểm' },
             ].map((item) => (
               <Col xs={12} sm={6} key={item.title} style={{ textAlign:'center' }}>

@@ -43,8 +43,8 @@ export const checkoutService = {
     const res = await axiosInstance.get('/api/coupons/list');
     return res.data; // Backend trả về List<CouponResponseDTO>
   },
-  retryMomoPayment: async (orderId) => {
-    const res = await axiosInstance.post(`/api/payments/momo/recreate/${orderId}`);
+  retryVNPayPayment: async (orderId) => {
+    const res = await axiosInstance.post(`/api/payments/vnpay/recreate/${orderId}`);
     return res.data; // Backend trả về { paymentUrl: "..." }
   },
 };

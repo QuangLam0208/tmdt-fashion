@@ -39,14 +39,12 @@ export const ORDER_STATUS_COLOR = {
 export const PAYMENT_METHOD = {
   COD:           'COD',
   VNPAY:         'VNPAY',
-  MOMO:          'MOMO',
   BANK_TRANSFER: 'BANK_TRANSFER',
 };
 
 export const PAYMENT_METHOD_LABEL = {
   COD:           'Thanh toán khi nhận hàng',
   VNPAY:         'VNPay',
-  MOMO:          'MoMo',
   BANK_TRANSFER: 'Chuyển khoản ngân hàng',
 };
 
