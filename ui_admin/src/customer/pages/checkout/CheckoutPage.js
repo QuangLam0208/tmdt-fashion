@@ -162,8 +162,8 @@ const CheckoutPage = () => {
       const res = await checkoutService.placeOrder(payload);
       await loadCart();
 
-      if (paymentMethod === 'MOMO' && res.paymentUrl) {
-        message.loading('Đang chuyển hướng sang cổng thanh toán MoMo...', 1.5);
+      if (paymentMethod === 'VNPAY' && res.paymentUrl) {
+        message.loading('Đang chuyển hướng sang cổng thanh toán VNPay...', 1.5);
         window.location.href = res.paymentUrl;
         return;
       }
@@ -286,7 +286,7 @@ const CheckoutPage = () => {
                   <Radio value="COD" style={{ fontWeight: 500 }}>Thanh toán khi nhận hàng (COD)</Radio>
                 </div>
                 <div style={{ border: '1px solid #eaeaea', padding: '12px 16px', borderRadius: 8, background: '#fafafa' }}>
-                  <Radio value="MOMO" style={{ fontWeight: 500 }}>Thanh toán qua Ví điện tử MoMo</Radio>
+                  <Radio value="VNPAY" style={{ fontWeight: 500 }}>Thanh toán qua VNPay</Radio>
                 </div>
               </Radio.Group>
             </Card>
