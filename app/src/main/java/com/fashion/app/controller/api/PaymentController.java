@@ -36,41 +36,43 @@ public class PaymentController {
     }
 
     /**
-     * API nhận Webhook/IPN từ hệ thống MoMo (Server-to-Server)
-     * MoMo sẽ gọi vào endpoint này để cập nhật trạng thái giao dịch (thành công/thất bại) ngầm
+     * API nhận Webhook/IPN từ hệ thống VNPay (Server-to-Server)
+     * VNPay sẽ gọi vào endpoint này để cập nhật trạng thái giao dịch (thành công/thất bại) ngầm.
+     * URL này phải được khai báo thủ công trong VNPay Merchant Admin (Sandbox), không truyền qua request tạo thanh toán.
      */
-    @PostMapping("/momo/ipn")
-    public ResponseEntity<String> processMomoIPN(@RequestBody Map<String, Object> payload) {
+    @PostMapping("/vnpay/ipn")
+    public ResponseEntity<String> processVNPayIPN(@RequestBody Map<String, Object> payload) {
         try {
-            log.info("Nhận được IPN từ MoMo: {}", payload);
-            paymentService.processMomoIPN(payload);
+            log.info("Nhận được IPN từ VNPay: {}", payload);
+            paymentService.processVNPayIPN(payload);
             return ResponseEntity.ok("success");
         } catch (Exception e) {
-            log.error("Lỗi khi xử lý IPN MoMo: {}", e.getMessage(), e);
+            log.error("Lỗi khi xử lý IPN VNPay: {}", e.getMessage(), e);
             return ResponseEntity.badRequest().body("Lỗi: " + e.getMessage());
         }
     }
 
     /**
-     * API xử lý URL Return từ MoMo (Trang chuyển hướng người dùng sau khi thanh toán xong trên app/web MoMo)
+     * API xử lý URL Return từ VNPay (Trang chuyển hướng người dùng sau khi thanh toán xong trên cổng VNPay)
      */
-    @GetMapping("/momo/return")
-    public ResponseEntity<Void> processMomoReturn(@RequestParam Map<String, String> allParams) {
-        String status = paymentService.processMomoReturn(allParams);
-        String orderId = allParams.get("orderId");
+    @GetMapping("/vnpay/return")
+    public ResponseEntity<Void> processVNPayReturn(@RequestParam Map<String, String> allParams) {
+        String status = paymentService.processVNPayReturn(allParams);
+        String txnRef = allParams.get("vnp_TxnRef");
+        String orderId = txnRef != null ? txnRef.split("_")[0] : null;
 
-        String redirectUrl = frontendUrl + "personal-center?orderId=" + orderId + "&paymentStatus=" + status;
+        String redirectUrl = frontendUrl + "checkout/payment-result?orderId=" + orderId + "&paymentStatus=" + status;
 
         return ResponseEntity.status(HttpStatus.FOUND)
                 .location(URI.create(redirectUrl)).build();
     }
 
     /**
-     * API tạo lại liên kết thanh toán MoMo cho đơn hàng (nếu đơn hàng chưa thanh toán và chọn MoMo)
+     * API tạo lại liên kết thanh toán VNPay cho đơn hàng (nếu đơn hàng chưa thanh toán và chọn VNPay)
      */
-    @PostMapping("/momo/recreate/{orderId}")
-    public ResponseEntity<PaymentResponseDTO> recreateMomoPayment(@PathVariable Long orderId) {
-        PaymentResponseDTO response = paymentService.recreateMomoPayment(orderId);
+    @PostMapping("/vnpay/recreate/{orderId}")
+    public ResponseEntity<PaymentResponseDTO> recreateVNPayPayment(@PathVariable Long orderId) {
+        PaymentResponseDTO response = paymentService.recreateVNPayPayment(orderId);
         return ResponseEntity.ok(response);
     }
 }

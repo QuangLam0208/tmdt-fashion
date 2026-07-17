@@ -16,7 +16,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.Date;
+import java.time.Instant;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -41,54 +41,54 @@ class OrderExpirationTaskTest {
     @InjectMocks
     private OrderExpirationTask orderExpirationTask;
 
-    private Order momoOrder;
-    private OrderItem momoOrderItem;
+    private Order vnPayOrder;
+    private OrderItem vnPayOrderItem;
 
     @BeforeEach
     void setUp() {
-        momoOrder = new Order();
-        momoOrder.setId(1L);
-        momoOrder.setPaymentMethod(PaymentMethod.MOMO);
-        momoOrder.setStatus(OrderStatus.PENDING_PAYMENT);
+        vnPayOrder = new Order();
+        vnPayOrder.setId(1L);
+        vnPayOrder.setPaymentMethod(PaymentMethod.VNPAY);
+        vnPayOrder.setStatus(OrderStatus.PENDING_PAYMENT);
 
-        momoOrderItem = new OrderItem();
-        momoOrderItem.setId(10L);
-        momoOrderItem.setStatus(OrderStatus.PENDING_PAYMENT);
-        momoOrder.setOrderItems(List.of(momoOrderItem));
+        vnPayOrderItem = new OrderItem();
+        vnPayOrderItem.setId(10L);
+        vnPayOrderItem.setStatus(OrderStatus.PENDING_PAYMENT);
+        vnPayOrder.setOrderItems(List.of(vnPayOrderItem));
     }
 
     @Test
-    @DisplayName("Case: tiền đã trừ nhưng mất kết nối — đối soát MoMo xác nhận đã thanh toán thì KHÔNG hủy đơn")
-    void cleanupExpiredOrders_MomoOrderReconciledAsPaid_SkipsExpiration() {
-        when(orderRepository.findByStatusAndOrderDateBefore(eq(OrderStatus.PENDING_PAYMENT), any(Date.class).toInstant()))
-                .thenReturn(List.of(momoOrder));
-        when(paymentService.reconcilePendingMomoPayment(1L)).thenReturn(true);
+    @DisplayName("Case: tiền đã trừ nhưng mất kết nối — đối soát VNPay xác nhận đã thanh toán thì KHÔNG hủy đơn")
+    void cleanupExpiredOrders_VNPayOrderReconciledAsPaid_SkipsExpiration() {
+        when(orderRepository.findByStatusAndOrderDateBefore(eq(OrderStatus.PENDING_PAYMENT), any(Instant.class)))
+                .thenReturn(List.of(vnPayOrder));
+        when(paymentService.reconcilePendingVNPayPayment(1L)).thenReturn(true);
 
         orderExpirationTask.cleanupExpiredOrders();
 
-        verify(paymentService, times(1)).reconcilePendingMomoPayment(1L);
+        verify(paymentService, times(1)).reconcilePendingVNPayPayment(1L);
         // Không được hủy: không gọi revertInventory, không lưu order với status hết hạn
         verify(orderService, never()).revertInventory(anyLong());
         verify(orderRepository, never()).save(any(Order.class));
     }
 
     @Test
-    @DisplayName("Đơn MoMo đối soát vẫn CHƯA thanh toán thì tiếp tục hủy như bình thường")
-    void cleanupExpiredOrders_MomoOrderNotReconciled_ProceedsToExpire() {
-        when(orderRepository.findByStatusAndOrderDateBefore(eq(OrderStatus.PENDING_PAYMENT), any(Date.class).toInstant()))
-                .thenReturn(List.of(momoOrder));
-        when(paymentService.reconcilePendingMomoPayment(1L)).thenReturn(false);
+    @DisplayName("Đơn VNPay đối soát vẫn CHƯA thanh toán thì tiếp tục hủy như bình thường")
+    void cleanupExpiredOrders_VNPayOrderNotReconciled_ProceedsToExpire() {
+        when(orderRepository.findByStatusAndOrderDateBefore(eq(OrderStatus.PENDING_PAYMENT), any(Instant.class)))
+                .thenReturn(List.of(vnPayOrder));
+        when(paymentService.reconcilePendingVNPayPayment(1L)).thenReturn(false);
 
         orderExpirationTask.cleanupExpiredOrders();
 
-        assertEquals(OrderStatus.PAYMENT_EXPIRED, momoOrder.getStatus());
-        assertEquals(OrderStatus.PAYMENT_EXPIRED, momoOrderItem.getStatus());
+        assertEquals(OrderStatus.PAYMENT_EXPIRED, vnPayOrder.getStatus());
+        assertEquals(OrderStatus.PAYMENT_EXPIRED, vnPayOrderItem.getStatus());
         verify(orderService, times(1)).revertInventory(1L);
-        verify(orderRepository, times(1)).save(momoOrder);
+        verify(orderRepository, times(1)).save(vnPayOrder);
     }
 
     @Test
-    @DisplayName("Đơn COD quá hạn không cần đối soát MoMo, hủy trực tiếp")
+    @DisplayName("Đơn COD quá hạn không cần đối soát VNPay, hủy trực tiếp")
     void cleanupExpiredOrders_CodOrder_ExpiresWithoutReconciliation() {
         Order codOrder = new Order();
         codOrder.setId(2L);
@@ -98,12 +98,12 @@ class OrderExpirationTaskTest {
         codItem.setStatus(OrderStatus.PENDING_PAYMENT);
         codOrder.setOrderItems(List.of(codItem));
 
-        when(orderRepository.findByStatusAndOrderDateBefore(eq(OrderStatus.PENDING_PAYMENT), any(Date.class).toInstant()))
+        when(orderRepository.findByStatusAndOrderDateBefore(eq(OrderStatus.PENDING_PAYMENT), any(Instant.class)))
                 .thenReturn(List.of(codOrder));
 
         orderExpirationTask.cleanupExpiredOrders();
 
-        verify(paymentService, never()).reconcilePendingMomoPayment(anyLong());
+        verify(paymentService, never()).reconcilePendingVNPayPayment(anyLong());
         assertEquals(OrderStatus.PAYMENT_EXPIRED, codOrder.getStatus());
         verify(orderService, times(1)).revertInventory(2L);
     }

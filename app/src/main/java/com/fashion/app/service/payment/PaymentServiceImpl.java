@@ -55,60 +55,60 @@ public class PaymentServiceImpl implements PaymentService {
     private final ProductVariantRepository productVariantRepository;
     private final PaymentTransactionRepository paymentTransactionRepository;
     private final UserRepository userRepository;
-    private final MomoService momoService;
+    private final VNPayService vnPayService;
     private final OrderManagementService orderManagementService;
     private final NotificationService notificationService;
 
     @Override
     @Transactional
-    public void processMomoIPN(Map<String, Object> payload) {
+    public void processVNPayIPN(Map<String, Object> payload) {
         Map<String, String> stringParams = new java.util.HashMap<>();
         payload.forEach((k, v) -> stringParams.put(k, String.valueOf(v)));
 
-        if (!momoService.verifySignature(stringParams)) {
-            throw new RuntimeException("Chữ ký MoMo không hợp lệ!");
+        if (!vnPayService.verifySignature(stringParams)) {
+            throw new RuntimeException("Chữ ký VNPay không hợp lệ!");
         }
 
-        int resultCode = Integer.parseInt(stringParams.get("resultCode"));
-        Long orderId = Long.parseLong(stringParams.get("orderId"));
-        String transId = stringParams.get("transId");
-        String requestId = stringParams.get("requestId");
+        String responseCode = stringParams.get("vnp_ResponseCode");
+        Long orderId = Long.parseLong(stringParams.get("vnp_TxnRef").split("_")[0]);
+        String transId = stringParams.get("vnp_TransactionNo");
+        String requestId = stringParams.get("vnp_TxnRef");
 
-        applyGatewayResult(orderId, transId, requestId, resultCode == 0, "IPN: " + payload);
+        applyGatewayResult(orderId, transId, requestId, "00".equals(responseCode), "IPN: " + payload);
     }
 
     @Override
     @Transactional
-    public String processMomoReturn(Map<String, String> allParams) {
-        if (!momoService.verifySignature(allParams)) {
+    public String processVNPayReturn(Map<String, String> allParams) {
+        if (!vnPayService.verifySignature(allParams)) {
             return "failed";
         }
 
-        String resultCode = allParams.get("resultCode");
-        Long orderId = Long.parseLong(allParams.get("orderId"));
-        String transId = allParams.get("transId");
-        String requestId = allParams.get("requestId");
+        String responseCode = allParams.get("vnp_ResponseCode");
+        String requestId = allParams.get("vnp_TxnRef");
+        Long orderId = Long.parseLong(requestId.split("_")[0]);
+        String transId = allParams.get("vnp_TransactionNo");
 
-        boolean success = "0".equals(resultCode);
+        boolean success = "00".equals(responseCode);
         applyGatewayResult(orderId, transId, requestId, success, "RETURN: " + allParams);
 
         return success ? "success" : "failed";
     }
 
     /**
-     * Điểm hội tụ xử lý kết quả từ cổng MoMo (IPN, return URL, hoặc query đối soát chủ động).
+     * Điểm hội tụ xử lý kết quả từ cổng VNPay (IPN, return URL, hoặc query đối soát chủ động).
      * Bảo đảm idempotency qua transId trước khi cập nhật trạng thái đơn hàng.
      */
     private void applyGatewayResult(Long orderId, String transId, String requestId, boolean success, String rawPayload) {
-        // 1. Chốt chặn idempotency: transId này đã được xử lý rồi thì bỏ qua, không làm lại (chống retry trùng của MoMo)
-        if (transId != null && paymentTransactionRepository.existsByProviderAndTransId(PaymentProvider.MOMO, transId)) {
-            log.info("Bỏ qua vì transId {} của MoMo đã được xử lý trước đó (idempotent no-op) cho đơn #{}", transId, orderId);
+        // 1. Chốt chặn idempotency: transId này đã được xử lý rồi thì bỏ qua, không làm lại (chống retry trùng của VNPay)
+        if (transId != null && paymentTransactionRepository.existsByProviderAndTransId(PaymentProvider.VNPAY, transId)) {
+            log.info("Bỏ qua vì transId {} của VNPay đã được xử lý trước đó (idempotent no-op) cho đơn #{}", transId, orderId);
             return;
         }
 
         // 2. Ghi nhận/khớp lại bản ghi PaymentTransaction tương ứng
         Optional<PaymentTransaction> pendingTx = requestId != null
-                ? paymentTransactionRepository.findByProviderAndRequestId(PaymentProvider.MOMO, requestId)
+                ? paymentTransactionRepository.findByProviderAndRequestId(PaymentProvider.VNPAY, requestId)
                 : Optional.empty();
 
         PaymentTransaction tx = pendingTx.orElseGet(() -> {
@@ -116,7 +116,7 @@ public class PaymentServiceImpl implements PaymentService {
                     .orElseThrow(() -> new ResourceNotFoundException("Đơn hàng không tồn tại!"));
             return PaymentTransaction.builder()
                     .order(order)
-                    .provider(PaymentProvider.MOMO)
+                    .provider(PaymentProvider.VNPAY)
                     .requestId(requestId)
                     .amount(order.getTotalAmount())
                     .createdAt(Instant.now())
@@ -178,12 +178,12 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     /**
-     * Case "tiền đã trừ nhưng mất kết nối": MoMo báo thanh toán thành công NHƯNG đơn đã bị
+     * Case "tiền đã trừ nhưng mất kết nối": VNPay báo thanh toán thành công NHƯNG đơn đã bị
      * OrderExpirationTask tự động hủy/hoàn kho trước đó (do quá 10 phút không nhận được IPN kịp thời).
      * Không được im lặng bỏ qua giao dịch đã thu tiền thật — phải cố gắng khôi phục đơn và luôn báo admin.
      */
     private void handleLatePaymentAfterExpiry(Order order) {
-        log.warn("Nhận thanh toán MoMo THÀNH CÔNG cho đơn #{} nhưng đơn đã ở trạng thái {} (đã hết hạn/hủy trước đó). Tiến hành xử lý bù trừ.",
+        log.warn("Nhận thanh toán VNPay THÀNH CÔNG cho đơn #{} nhưng đơn đã ở trạng thái {} (đã hết hạn/hủy trước đó). Tiến hành xử lý bù trừ.",
                 order.getId(), order.getStatus());
 
         boolean stockRestored = true;
@@ -227,7 +227,7 @@ public class PaymentServiceImpl implements PaymentService {
             orderRepository.save(order);
 
             adminMessage = "Đơn hàng #" + order.getId()
-                    + " đã tự động khôi phục về trạng thái PAID sau khi MoMo báo thanh toán thành công muộn (đơn từng bị hết hạn). "
+                    + " đã tự động khôi phục về trạng thái PAID sau khi VNPay báo thanh toán thành công muộn (đơn từng bị hết hạn). "
                     + "Vui lòng kiểm tra lại tồn kho và xử lý đơn như bình thường.";
         } else {
             // Không đủ hàng để giao (đã bán mất trong lúc chờ): KHÔNG đánh dấu PAID, đánh dấu cần hoàn tiền khẩn cấp
@@ -237,7 +237,7 @@ public class PaymentServiceImpl implements PaymentService {
             }
 
             adminMessage = "CẢNH BÁO: Đơn hàng #" + order.getId()
-                    + " đã được khách thanh toán MoMo thành công (muộn) nhưng tồn kho không còn đủ để giao "
+                    + " đã được khách thanh toán VNPay thành công (muộn) nhưng tồn kho không còn đủ để giao "
                     + "(đơn đã bị hủy/hết hạn trước đó và sản phẩm có thể đã bán cho khách khác). "
                     + "Cần XỬ LÝ HOÀN TIỀN THỦ CÔNG cho khách ngay.";
         }
@@ -270,7 +270,7 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     @Transactional
-    public PaymentResponseDTO recreateMomoPayment(Long orderId) {
+    public PaymentResponseDTO recreateVNPayPayment(Long orderId) {
         Long userId = SecurityUtils.getAuthenticatedUserId();
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new ResourceNotFoundException("Đơn hàng không tồn tại!"));
@@ -279,11 +279,11 @@ public class PaymentServiceImpl implements PaymentService {
             throw new AccessDeniedException("Bạn không có quyền truy cập đơn hàng này!");
         }
 
-        if (order.getStatus() != OrderStatus.PENDING_PAYMENT || order.getPaymentMethod() != PaymentMethod.MOMO) {
+        if (order.getStatus() != OrderStatus.PENDING_PAYMENT || order.getPaymentMethod() != PaymentMethod.VNPAY) {
             throw new BadRequestException("Đơn hàng không đủ điều kiện để thanh toán lại");
         }
 
-        String paymentUrl = momoService.createPaymentUrl(order.getId(), order.getTotalAmount());
+        String paymentUrl = vnPayService.createPaymentUrl(order.getId(), order.getTotalAmount());
 
         return PaymentResponseDTO.builder()
                 .status("SUCCESS")
@@ -294,28 +294,28 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     @Transactional
-    public boolean reconcilePendingMomoPayment(Long orderId) {
+    public boolean reconcilePendingVNPayPayment(Long orderId) {
         Optional<PaymentTransaction> pendingTx = paymentTransactionRepository
-                .findFirstByOrderIdAndProviderAndStatusOrderByCreatedAtDesc(orderId, PaymentProvider.MOMO, PaymentTransactionStatus.PENDING);
+                .findFirstByOrderIdAndProviderAndStatusOrderByCreatedAtDesc(orderId, PaymentProvider.VNPAY, PaymentTransactionStatus.PENDING);
 
         if (pendingTx.isEmpty() || pendingTx.get().getRequestId() == null) {
-            log.info("Không có giao dịch MoMo PENDING nào để đối soát cho đơn #{}", orderId);
+            log.info("Không có giao dịch VNPay PENDING nào để đối soát cho đơn #{}", orderId);
             return false;
         }
 
         String requestId = pendingTx.get().getRequestId();
-        MomoService.MomoQueryResult result = momoService.queryTransaction(orderId, requestId);
+        VNPayService.VNPayQueryResult result = vnPayService.queryTransaction(orderId, requestId);
 
         if (!result.isSuccess()) {
-            log.info("Đối soát MoMo cho đơn #{} (requestId={}): chưa xác nhận thành công (resultCode={}, message={})",
-                    orderId, requestId, result.resultCode(), result.message());
+            log.info("Đối soát VNPay cho đơn #{} (requestId={}): chưa xác nhận thành công (responseCode={}, message={})",
+                    orderId, requestId, result.responseCode(), result.message());
             return false;
         }
 
-        log.warn("Đối soát MoMo phát hiện đơn #{} (requestId={}) ĐÃ thanh toán thành công (transId={}) — khôi phục đơn thay vì để hết hạn.",
-                orderId, requestId, result.transId());
+        log.warn("Đối soát VNPay phát hiện đơn #{} (requestId={}) ĐÃ thanh toán thành công (transId={}) — khôi phục đơn thay vì để hết hạn.",
+                orderId, requestId, result.transactionNo());
 
-        applyGatewayResult(orderId, result.transId(), requestId, true, "RECONCILE_QUERY: " + result.rawResponse());
+        applyGatewayResult(orderId, result.transactionNo(), requestId, true, "RECONCILE_QUERY: " + result.rawResponse());
         return true;
     }
 }

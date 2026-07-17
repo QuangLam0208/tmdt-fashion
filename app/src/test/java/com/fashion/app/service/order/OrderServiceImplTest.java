@@ -10,7 +10,7 @@ import com.fashion.app.model.*;
 import com.fashion.app.model.enums.*;
 import com.fashion.app.repository.*;
 import com.fashion.app.service.notification.NotificationService;
-import com.fashion.app.service.payment.MomoService;
+import com.fashion.app.service.payment.VNPayService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -50,7 +50,7 @@ class OrderServiceImplTest {
     @Mock
     private UserCouponRepository userCouponRepository;
     @Mock
-    private MomoService momoService;
+    private VNPayService vnPayService;
     @Mock
     private NotificationService notificationService;
 
@@ -342,10 +342,10 @@ class OrderServiceImplTest {
         // Act
         PlaceOrderResponseDTO response = orderService.placeOrder(dto);
 
-        // Assert: paymentUrl phải null, MoMo không được gọi
+        // Assert: paymentUrl phải null, VNPay không được gọi
         assertNull(response.getPaymentUrl(),
                 "AC-02: paymentUrl phải là null khi COD");
-        verify(momoService, never()).createPaymentUrl(anyLong(), anyDouble());
+        verify(vnPayService, never()).createPaymentUrl(anyLong(), anyDouble());
     }
 
     /**
@@ -382,17 +382,17 @@ class OrderServiceImplTest {
     }
 
     /**
-     * AC-BE-US24-01 mở rộng: Khi MOMO → status phải là PENDING_PAYMENT (KHÔNG phải PENDING_CONFIRMATION)
+     * AC-BE-US24-01 mở rộng: Khi VNPAY → status phải là PENDING_PAYMENT (KHÔNG phải PENDING_CONFIRMATION)
      * → Đảm bảo logic phân nhánh initialStatus hoạt động đúng cho cả 2 case.
      */
     @Test
-    void placeOrder_MOMO_Status_ShouldBePendingPayment_NotPendingConfirmation() {
+    void placeOrder_VNPAY_Status_ShouldBePendingPayment_NotPendingConfirmation() {
         // Arrange
         PlaceOrderRequestDTO dto = PlaceOrderRequestDTO.builder()
                 .userId(1L)
                 .cartItemIds(List.of(1000L))
                 .shippingAddress("202 Võ Văn Tần")
-                .paymentMethod(PaymentMethod.MOMO)
+                .paymentMethod(PaymentMethod.VNPAY)
                 .couponCode(null)
                 .build();
 
@@ -403,25 +403,25 @@ class OrderServiceImplTest {
             o.setId(603L);
             return o;
         });
-        when(momoService.createPaymentUrl(anyLong(), anyDouble())).thenReturn("https://momo.vn/pay/123");
+        when(vnPayService.createPaymentUrl(anyLong(), anyDouble())).thenReturn("https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?pay/123");
 
         // Act
         PlaceOrderResponseDTO response = orderService.placeOrder(dto);
 
         // Assert: status = PENDING_PAYMENT (khác COD)
         assertEquals(OrderStatus.PENDING_PAYMENT, response.getStatus(),
-                "MOMO phải có status PENDING_PAYMENT");
+                "VNPAY phải có status PENDING_PAYMENT");
 
         // Assert: paymentUrl KHÔNG null (ngược lại COD)
         assertNotNull(response.getPaymentUrl(),
-                "MOMO phải có paymentUrl");
+                "VNPAY phải có paymentUrl");
 
         // Assert: OrderItem cũng phải PENDING_PAYMENT
         ArgumentCaptor<OrderItem> itemCaptor = ArgumentCaptor.forClass(OrderItem.class);
         verify(orderItemRepository, atLeastOnce()).save(itemCaptor.capture());
         for (OrderItem item : itemCaptor.getAllValues()) {
             assertEquals(OrderStatus.PENDING_PAYMENT, item.getStatus(),
-                    "MOMO OrderItem.status phải là PENDING_PAYMENT");
+                    "VNPAY OrderItem.status phải là PENDING_PAYMENT");
         }
     }
     // =========================================================================
@@ -519,7 +519,7 @@ class OrderServiceImplTest {
                 .id(10L)
                 .user(mockUser)
                 .status(OrderStatus.PAID)
-                .paymentMethod(PaymentMethod.MOMO)
+                .paymentMethod(PaymentMethod.VNPAY)
                 .orderItems(List.of(orderItem))
                 .build();
 
