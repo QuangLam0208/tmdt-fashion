@@ -79,6 +79,11 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/products/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/categories/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/reviews/**").permitAll()
+                        // Chỉ mở callback của VNPay
+                        .requestMatchers(
+                                "/api/payments/vnpay/ipn",
+                                "/api/payments/vnpay/return"
+                        ).permitAll()
 
                         // === ADMIN ENDPOINTS ===
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
