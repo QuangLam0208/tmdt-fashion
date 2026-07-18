@@ -1,0 +1,151 @@
+@startuml SequenceDiagram_Payment_Reconciliation_B_Detail
+
+title Sequence Diagram — Đối soát & Hết hạn thanh toán VNPay\nPhần B: reconcilePendingVNPayPayment() chi tiết
+
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 200
+skinparam roundcorner 6
+skinparam ArrowThickness 1.2
+hide footbox
+
+skinparam sequence {
+  ArrowColor #A3503F
+  ArrowFontColor #333333
+  ArrowFontSize 12
+  ActorBackgroundColor #F5EEEB
+  ActorBorderColor #A3503F
+  ActorFontStyle bold
+  ParticipantBackgroundColor #F5EEEB
+  ParticipantBorderColor #A3503F
+  ParticipantFontStyle bold
+  LifeLineBackgroundColor #F5EEEB
+  LifeLineBorderColor #DDB3A8
+  DatabaseBackgroundColor #F7F7F7
+  DatabaseBorderColor #757575
+  DatabaseFontStyle bold
+  GroupBackgroundColor #F5EEEB
+  GroupBodyBackgroundColor transparent
+  GroupBorderColor #A3503F
+  GroupFontColor #333333
+  GroupHeaderFontColor #7A3A2D
+  DividerBackgroundColor #F5EEEB
+  DividerBorderColor #A3503F
+  DividerFontColor #7A3A2D
+  DividerFontStyle bold
+  ReferenceBackgroundColor #F5EEEB
+  ReferenceBorderColor #A3503F
+  ReferenceHeaderBackgroundColor #F5EEEB
+  NoteBackgroundColor #FFF8E1
+  NoteBorderColor #757575
+  NoteFontColor #333333
+  NoteFontSize 12
+}
+
+legend top left
+|<back:#EAF3EA>    </back>| An toàn, idempotent — không cần xử lý thêm |
+|<back:#FBEAEA>    </back>| Rollback / cảnh báo nghiêm trọng |
+|<back:#F2F2F2>    </back>| Chi tiết kỹ thuật / ngoài trọng tâm |
+|<back:#EEF2F7>    </back>| Tham chiếu chéo sang sequence khác |
+endlegend
+
+autonumber "<b>[0]"
+
+participant "OrderExpirationTask" as ExpireTask
+participant "PaymentServiceImpl" as PaySvc
+database "PaymentTransactionRepository" as TxRepo
+participant "VNPayService" as VNPaySvc
+participant "**VNPay Sandbox API**\n(sandbox.vnpayment.vn)" as VNPayAPI
+
+ref over ExpireTask, PaySvc #EEF2F7
+  Được gọi cho mỗi đơn VNPay quá hạn, TRƯỚC khi huỷ đơn
+  (xem sequence "Đối soát & Hết hạn — Phần A: Vòng lặp OrderExpirationTask")
+end ref
+
+ExpireTask -> PaySvc : reconcilePendingVNPayPayment(order.id)
+activate PaySvc
+
+PaySvc -> TxRepo : findFirstByOrderIdAndProviderAndStatusOrderByCreatedAtDesc(\n  orderId, VNPAY, **PENDING**)
+
+alt không có PaymentTransaction PENDING nào (chưa từng tạo giao dịch,\nhoặc requestId của bản ghi PENDING là null)
+  TxRepo --> PaySvc : Optional.empty() (hoặc requestId == null)
+  PaySvc -> PaySvc : log.info("Không có giao dịch VNPay PENDING để đối soát")
+  PaySvc --> ExpireTask : return **false**
+else có bản ghi PENDING (requestId = vnp_TxnRef của lần tạo paymentUrl gần nhất)
+  TxRepo --> PaySvc : PaymentTransaction{requestId}
+
+  PaySvc -> VNPaySvc : queryTransaction(orderId, txnRef=requestId)
+  activate VNPaySvc
+
+  note right of VNPaySvc #F2F2F2
+    queryTransaction() tự tra lại DB 1 lần nữa (độc lập với bước tìm ở PaySvc
+    phía trên) để lấy chính xác createdAt gốc — VNPay bắt buộc phải gửi lại
+    đúng vnp_TransactionDate ban đầu trong request querydr.
+  end note
+
+  VNPaySvc -> TxRepo : findByProviderAndRequestId(VNPAY, txnRef)
+
+  alt không tìm thấy (về lý thuyết không xảy ra ở luồng này —\ntxnRef vừa lấy từ chính bản ghi PENDING ở trên)
+    TxRepo --> VNPaySvc : Optional.empty()
+    VNPaySvc --> PaySvc : VNPayQueryResult(null, null, null,\n"Không tìm thấy giao dịch gốc để đối soát", "")
+    PaySvc --> ExpireTask : return **false**
+  else tìm thấy (luôn đúng trong thực tế)
+    TxRepo --> VNPaySvc : PaymentTransaction{createdAt}
+  end
+
+  VNPaySvc -> VNPaySvc : transactionDate = originalTx.createdAt (giờ VN)\nnow = LocalDateTime.now(Asia/Ho_Chi_Minh)\nrequestId(mới) = System.currentTimeMillis()\norderInfo = "Tra cuu giao dich don hang " + orderId
+  VNPaySvc -> VNPaySvc : hashData = join("|", requestId, version, "querydr",\n  tmnCode, txnRef, transactionDate, now, ipAddr, orderInfo)\nsecureHash = hmacSha512(hashData, hashSecret)
+
+  VNPaySvc -> VNPayAPI : POST /merchant_webapi/api/transaction (JSON)\n{vnp_RequestId, vnp_Version, vnp_Command=querydr,\nvnp_TmnCode, vnp_TxnRef, vnp_OrderInfo,\nvnp_TransactionDate, vnp_CreateDate, vnp_IpAddr, vnp_SecureHash}
+
+  alt kết nối lỗi / timeout
+    VNPayAPI --> VNPaySvc : Exception
+    VNPaySvc --> PaySvc : VNPayQueryResult(responseCode=null,\ntransactionStatus=null, message="Không thể kết nối...")
+  else kết nối OK
+    VNPayAPI --> VNPaySvc : {vnp_ResponseCode, vnp_TransactionStatus,\nvnp_TransactionNo, vnp_Message}
+    VNPaySvc --> PaySvc : VNPayQueryResult(responseCode, transactionStatus,\ntransactionNo, message, rawResponse)
+  end
+  deactivate VNPaySvc
+
+  alt !result.isSuccess()\n("00".equals(responseCode) && "00".equals(transactionStatus) == false)
+    note right of PaySvc #F2F2F2
+      VNPay yêu cầu **cả 2 điều kiện**: vnp_ResponseCode=="00" (request querydr
+      hợp lệ) VÀ vnp_TransactionStatus=="00" (giao dịch thực sự thành công) —
+      khác MoMo chỉ cần check 1 resultCode duy nhất.
+    end note
+    PaySvc -> PaySvc : log.info("Chưa xác nhận thành công\n(responseCode={}, message={})")
+    PaySvc --> ExpireTask : return **false**
+  else result.isSuccess() == true  (VNPay xác nhận **ĐÃ thanh toán thành công**)
+    note right of PaySvc #FBEAEA
+      **Đây chính là case "tiền đã trừ nhưng mất kết nối"**:
+      VNPay đã ghi nhận thanh toán, nhưng Return/IPN gọi về server của mình
+      bị mất/timeout nên hệ thống không hề hay biết — nếu không có
+      bước đối soát này, đơn sẽ bị huỷ oan ở Phần A.
+    end note
+    PaySvc -> PaySvc : log.warn("Đối soát phát hiện đơn ĐÃ thanh toán —\nkhôi phục thay vì để hết hạn")
+    PaySvc -> PaySvc : applyGatewayResult(orderId, result.transactionNo(), requestId,\nsuccess=true, "RECONCILE_QUERY: " + result.rawResponse())
+
+    ref over PaySvc, TxRepo #EEF2F7
+      applyGatewayResult(): check idempotency qua transId (existsByProviderAndTransId),
+      cập nhật PaymentTransaction (SUCCESS), rồi gọi updateOrderPayStatus(orderId, true)
+      — chi tiết đầy đủ ở sequence "Đặt hàng VNPay — Phần B: IPN Callback"
+    end ref
+
+    note right of PaySvc #EAF3EA
+      Tại thời điểm này order.status **vẫn còn PENDING_PAYMENT**
+      (chưa bị Phần A set PAYMENT_EXPIRED — reconcile luôn chạy TRƯỚC),
+      nên updateOrderPayStatus() đi vào nhánh **bình thường**:
+      từng OrderItem PENDING_PAYMENT → PAID, lưu OrderHistory,
+      rồi đồng bộ Order.status = PAID.
+    end note
+
+    PaySvc --> ExpireTask : return **true**
+  end
+end
+deactivate PaySvc
+
+@enduml

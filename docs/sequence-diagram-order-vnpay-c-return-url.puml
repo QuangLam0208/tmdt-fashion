@@ -1,0 +1,91 @@
+@startuml SequenceDiagram_Order_VNPay_C_Return
+
+title Sequence Diagram — Đặt hàng + Thanh toán VNPay\nPhần C: VNPay Return URL (trình duyệt redirect, độc lập song song với Phần B)
+
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 200
+skinparam roundcorner 6
+skinparam ArrowThickness 1.2
+hide footbox
+
+skinparam sequence {
+  ArrowColor #0B5AA6
+  ArrowFontColor #333333
+  ArrowFontSize 12
+  ActorBackgroundColor #EAF1F8
+  ActorBorderColor #0B5AA6
+  ActorFontStyle bold
+  ParticipantBackgroundColor #EAF1F8
+  ParticipantBorderColor #0B5AA6
+  ParticipantFontStyle bold
+  LifeLineBackgroundColor #EAF1F8
+  LifeLineBorderColor #A8C6E3
+  DatabaseBackgroundColor #F7F7F7
+  DatabaseBorderColor #757575
+  DatabaseFontStyle bold
+  GroupBackgroundColor #EAF1F8
+  GroupBodyBackgroundColor transparent
+  GroupBorderColor #0B5AA6
+  GroupFontColor #333333
+  GroupHeaderFontColor #08417A
+  DividerBackgroundColor #EAF1F8
+  DividerBorderColor #0B5AA6
+  DividerFontColor #08417A
+  DividerFontStyle bold
+  ReferenceBackgroundColor #EAF1F8
+  ReferenceBorderColor #0B5AA6
+  ReferenceHeaderBackgroundColor #EAF1F8
+  NoteBackgroundColor #FFF8E1
+  NoteBorderColor #757575
+  NoteFontColor #333333
+  NoteFontSize 12
+}
+
+legend top left
+|<back:#EAF3EA>    </back>| An toàn, idempotent — không cần xử lý thêm |
+|<back:#EEF2F7>    </back>| Tham chiếu chéo sang sequence khác |
+endlegend
+
+autonumber "<b>[0]"
+
+actor "Khách hàng" as Customer
+participant "PaymentController" as PayCtrl
+participant "PaymentServiceImpl" as PaySvc
+participant "VNPayService" as VNPaySvc
+
+ref over PaySvc #EEF2F7
+  applyGatewayResult() ở đây chạy **lại y hệt** applyGatewayResult() ở Phần B
+  (xem sequence "Đặt hàng VNPay — Phần B: IPN Callback").
+  Nếu IPN đã xử lý transId này trước rồi ⇒ nhánh idempotency chặn lại,
+  Return chỉ trả kết quả, không update Order lần 2.
+end ref
+
+Customer -> PayCtrl : GET /api/payments/vnpay/return\n?vnp_TxnRef&vnp_ResponseCode&vnp_TransactionNo\n&vnp_Amount&vnp_SecureHash&...
+activate PayCtrl
+PayCtrl -> PaySvc : processVNPayReturn(allParams)
+activate PaySvc
+PaySvc -> VNPaySvc : verifySignature(allParams)
+VNPaySvc --> PaySvc : true/false
+
+alt chữ ký không hợp lệ
+  PaySvc --> PayCtrl : return "failed"
+else hợp lệ
+  PaySvc -> PaySvc : responseCode = vnp_ResponseCode\nrequestId = vnp_TxnRef\norderId = Long.parseLong(requestId.split("_")[0])\ntransId = vnp_TransactionNo\nsuccess = "00".equals(responseCode)
+  PaySvc -> PaySvc : applyGatewayResult(orderId, transId, requestId,\nsuccess, "RETURN: " + allParams)
+  note right of PaySvc #EAF3EA
+    Idempotent qua transId — xem chi tiết ở Phần B.
+  end note
+  PaySvc --> PayCtrl : return "success" / "failed"
+end
+deactivate PaySvc
+
+PayCtrl -> PayCtrl : txnRef = allParams.get("vnp_TxnRef")\norderId = txnRef.split("_")[0]\nredirectUrl = frontendUrl +\n"checkout/payment-result?orderId=..&paymentStatus=.."
+PayCtrl --> Customer : 302 Found → redirect
+deactivate PayCtrl
+
+@enduml

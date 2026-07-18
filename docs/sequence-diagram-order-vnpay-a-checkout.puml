@@ -1,0 +1,167 @@
+@startuml SequenceDiagram_Order_VNPay_A_Checkout
+
+title Sequence Diagram — Đặt hàng + Thanh toán VNPay\nPhần A: Khởi tạo đơn & tạo URL thanh toán (đồng bộ, trong 1 @Transactional)
+
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 200
+skinparam roundcorner 6
+skinparam ArrowThickness 1.2
+hide footbox
+
+skinparam sequence {
+  ArrowColor #0B5AA6
+  ArrowFontColor #333333
+  ArrowFontSize 12
+  ActorBackgroundColor #EAF1F8
+  ActorBorderColor #0B5AA6
+  ActorFontStyle bold
+  ParticipantBackgroundColor #EAF1F8
+  ParticipantBorderColor #0B5AA6
+  ParticipantFontStyle bold
+  LifeLineBackgroundColor #EAF1F8
+  LifeLineBorderColor #A8C6E3
+  DatabaseBackgroundColor #F7F7F7
+  DatabaseBorderColor #757575
+  DatabaseFontStyle bold
+  GroupBackgroundColor #EAF1F8
+  GroupBodyBackgroundColor transparent
+  GroupBorderColor #0B5AA6
+  GroupFontColor #333333
+  GroupHeaderFontColor #08417A
+  DividerBackgroundColor #EAF1F8
+  DividerBorderColor #0B5AA6
+  DividerFontColor #08417A
+  DividerFontStyle bold
+  ReferenceBackgroundColor #EAF1F8
+  ReferenceBorderColor #0B5AA6
+  ReferenceHeaderBackgroundColor #EAF1F8
+  NoteBackgroundColor #FFF8E1
+  NoteBorderColor #757575
+  NoteFontColor #333333
+  NoteFontSize 12
+}
+
+legend top left
+|<back:#EAF3EA>    </back>| An toàn, idempotent — không cần xử lý thêm |
+|<back:#FBEAEA>    </back>| Rollback / huỷ giao dịch — cảnh báo nghiêm trọng |
+|<back:#EEF2F7>    </back>| Tham chiếu chéo sang sequence khác |
+|<back:#F2F2F2>    </back>| Ngoài phạm vi của sequence này |
+endlegend
+
+autonumber "<b>[0]"
+
+actor "Khách hàng" as Customer
+participant "OrderController" as OrderCtrl
+participant "OrderServiceImpl" as OrderSvc
+participant "VNPayService" as VNPaySvc
+database "PaymentTransactionRepository" as TxRepo
+database "OrderRepository /\nOrderItemRepository" as OrderRepo
+participant "NotificationService" as NotiSvc
+
+Customer -> OrderCtrl : POST /api/orders\n{cartItemIds, shippingAddress,\npaymentMethod=VNPAY, couponCode?}
+activate OrderCtrl
+OrderCtrl -> OrderSvc : placeOrder(dto)
+activate OrderSvc
+
+ref over OrderSvc, OrderRepo #EEF2F7
+  Bước 0–3 giống hệt luồng COD:
+  tìm User, lấy CartItem, validate quyền sở hữu + tồn kho, áp coupon
+  (xem sequence "Đặt hàng COD", mục 1–3)
+end ref
+
+== 4. Khởi tạo Order (rẽ nhánh theo paymentMethod) ==
+
+OrderSvc -> OrderSvc : **initialStatus = PENDING_PAYMENT**\n(vì paymentMethod == VNPAY)
+note right of OrderSvc #EEF2F7
+  So sánh với luồng COD:
+  paymentMethod == COD ⇒ initialStatus = PENDING_CONFIRMATION
+  (xem sequence "Đặt hàng COD", mục 4 — cùng một đoạn code,\nchỉ khác nhánh giá trị theo paymentMethod)
+end note
+
+OrderSvc -> OrderSvc : new Order(orderDate, totalAmount,\nshippingAddress, paymentMethod=VNPAY,\ntype=ONLINE, user, coupon, status=PENDING_PAYMENT)
+OrderSvc -> OrderRepo : save(order)
+OrderRepo --> OrderSvc : order (có id)
+
+== 5–6. Tạo OrderItem, trừ tồn kho, xoá CartItem ==
+
+ref over OrderSvc, OrderRepo #EEF2F7
+  Giống hệt luồng COD (mục 5–6): loop mỗi CartItem tạo OrderItem\n(status = **PENDING_PAYMENT**, không phải PENDING_CONFIRMATION),\ntrừ variant.stockQuantity, rồi xoá CartItem
+  (xem sequence "Đặt hàng COD")
+end ref
+
+== 7. VNPayService.createPaymentUrl(orderId, totalAmount) ==
+
+note over OrderSvc, VNPaySvc #EEF2F7
+  Khác MoMo: VNPay **không** gọi API tạo giao dịch qua mạng ở bước này.
+  URL thanh toán được **tự build tại chỗ** (ký sẵn bằng HMAC-SHA512),
+  chỉ cần redirect khách sang cổng VNPay — không có nhánh lỗi kết nối ở đây.
+end note
+
+OrderSvc -> VNPaySvc : createPaymentUrl(order.id, order.totalAmount)
+activate VNPaySvc
+
+VNPaySvc -> OrderRepo : findById(orderId)
+OrderRepo --> VNPaySvc : Order
+
+VNPaySvc -> VNPaySvc : txnRef = orderId + "_" + System.currentTimeMillis()\norderInfo = "Thanh toan don hang " + orderId\namountValue = Math.round(amount * 100)\n(VNPay yêu cầu nhân 100 — đơn vị nhỏ nhất)
+VNPaySvc -> VNPaySvc : build TreeMap params (tự sắp xếp alphabet):\nvnp_Version, vnp_Command=pay, vnp_TmnCode, vnp_Amount,\nvnp_CurrCode=VND, vnp_TxnRef, vnp_OrderInfo, vnp_OrderType,\nvnp_Locale=vn, vnp_ReturnUrl, vnp_IpAddr, vnp_CreateDate,\nvnp_ExpireDate (createDate + 15 phút)
+
+note right of VNPaySvc #F2F2F2
+  vnp_IpAddr lấy từ header "X-Forwarded-For" của request hiện tại
+  (RequestContextHolder), fallback "127.0.0.1" nếu không nằm trong
+  1 HTTP request (vd: gọi từ code khác không qua controller).
+end note
+
+VNPaySvc -> VNPaySvc : **buildSignedUrl**(payUrl, params):\n  hashData = nối các param đã URL-encode value bằng "&"\n  (theo thứ tự alphabet của TreeMap, bỏ qua giá trị rỗng)\n  secureHash = hmacSha512(hashData, hashSecret)\n  return payUrl + "?" + query + "&vnp_SecureHash=" + secureHash
+
+VNPaySvc -> TxRepo : save(PaymentTransaction{\n  order, provider=VNPAY, requestId=txnRef,\n  amount, status=**PENDING**,\n  rawResponsePayload="CREATED: "+params, createdAt=now})
+
+VNPaySvc --> OrderSvc : return paymentUrl (đã ký sẵn)
+deactivate VNPaySvc
+
+note right of OrderSvc #FBEAEA
+  Trường hợp cực hiếm: hmacSha512() ném lỗi nội bộ (crypto exception)
+  ⇒ RuntimeException lan truyền ⇒ @Transactional **rollback toàn bộ**
+  placeOrder() (Order, OrderItem, trừ kho, xoá CartItem đều bị huỷ).
+  Khác MoMo: đây **không phải** lỗi mạng/timeout vì không có gọi API ở bước này.
+end note
+
+== 7.5. Đánh dấu Coupon đã sử dụng (nếu có) ==
+
+ref over OrderSvc #EEF2F7
+  Giống hệt luồng COD (mục 7): opt appliedCoupon != null ⇒
+  CouponRepo.userCoupon.setUsed(true); save(userCoupon)
+end ref
+
+== 9. Gửi thông báo & hoàn tất ==
+
+OrderSvc -> NotiSvc : createNotification(userId, "Đặt hàng thành công",\n"Đơn hàng #" + orderId + " của bạn đã được khởi tạo thành công.",\n"SUCCESS", orderId)
+
+OrderSvc --> OrderCtrl : PlaceOrderResponseDTO{\n  status=PENDING_PAYMENT, paymentUrl,\n  message="Đơn hàng đã được khởi tạo.\nVui lòng thanh toán trong vòng 10 phút."}
+deactivate OrderSvc
+OrderCtrl --> Customer : 201 Created {paymentUrl}
+deactivate OrderCtrl
+
+Customer -> Customer : redirect trình duyệt đến paymentUrl\n(trang thanh toán VNPay Sandbox — sandbox.vnpayment.vn)
+
+note over Customer #F2F2F2
+  Khách chọn ngân hàng / nhập thông tin thẻ và xác nhận thanh toán trên VNPay.
+  Bước này diễn ra bên ngoài hệ thống — không có API nội bộ nào được gọi.
+end note
+
+ref over Customer #EEF2F7
+  Tiếp theo, VNPay phản hồi hệ thống qua 2 kênh song song:
+  xem sequence "Đặt hàng VNPay — Phần B: IPN Callback"
+  và "Đặt hàng VNPay — Phần C: Return URL"
+
+  Lưu ý: khác MoMo (URL IPN truyền trực tiếp trong request tạo giao dịch),
+  URL IPN của VNPay phải được khai báo **thủ công** trong VNPay Merchant
+  Admin (Sandbox), không có tham số vnp_IpnUrl trong bước tạo giao dịch này.
+end ref
+
+@enduml
