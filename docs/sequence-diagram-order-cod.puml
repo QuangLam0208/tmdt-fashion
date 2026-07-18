@@ -1,0 +1,186 @@
+@startuml SequenceDiagram_Order_COD
+
+title Sequence Diagram — Đặt hàng (COD) — Happy Path
+
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam titleFontSize 16
+skinparam titleFontStyle bold
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 200
+skinparam roundcorner 6
+skinparam ArrowThickness 1.2
+hide footbox
+
+skinparam sequence {
+  ArrowColor #3F7D58
+  ArrowFontColor #333333
+  ArrowFontSize 12
+  ActorBackgroundColor #EAF3ED
+  ActorBorderColor #3F7D58
+  ActorFontStyle bold
+  ParticipantBackgroundColor #EAF3ED
+  ParticipantBorderColor #3F7D58
+  ParticipantFontStyle bold
+  LifeLineBackgroundColor #EAF3ED
+  LifeLineBorderColor #9CC2AC
+  DatabaseBackgroundColor #F7F7F7
+  DatabaseBorderColor #757575
+  DatabaseFontStyle bold
+  GroupBackgroundColor #EAF3ED
+  GroupBodyBackgroundColor transparent
+  GroupBorderColor #3F7D58
+  GroupFontColor #333333
+  GroupHeaderFontColor #2F5E42
+  DividerBackgroundColor #EAF3ED
+  DividerBorderColor #3F7D58
+  DividerFontColor #2F5E42
+  DividerFontStyle bold
+  ReferenceBackgroundColor #EAF3ED
+  ReferenceBorderColor #3F7D58
+  ReferenceHeaderBackgroundColor #EAF3ED
+  NoteBackgroundColor #FFF8E1
+  NoteBorderColor #757575
+  NoteFontColor #333333
+  NoteFontSize 12
+}
+
+legend top left
+|<back:#EAF3EA>    </back>| An toàn, idempotent — không cần xử lý thêm |
+|<back:#FBEAEA>    </back>| Rollback / huỷ giao dịch — cảnh báo nghiêm trọng |
+|<back:#FFF6E0>    </back>| Cần lưu ý — race condition / trường hợp đặc biệt |
+|<back:#EEF2F7>    </back>| Tham chiếu chéo sang sequence khác |
+|<back:#F2F2F2>    </back>| Ngoài phạm vi của sequence này |
+endlegend
+
+autonumber "<b>[0]"
+
+actor "Khách hàng" as Customer
+participant "OrderController" as Ctrl
+participant "OrderServiceImpl" as OrderSvc
+database "UserRepository" as UserRepo
+database "CartItemRepository" as CartRepo
+database "CouponRepository /\nUserCouponRepository" as CouponRepo
+database "ProductVariantRepository" as VariantRepo
+database "OrderRepository /\nOrderItemRepository" as OrderRepo
+participant "NotificationService" as NotiSvc
+
+Customer -> Ctrl : POST /api/orders\n{cartItemIds, shippingAddress,\npaymentMethod=COD, couponCode?}
+activate Ctrl
+
+Ctrl -> Ctrl : dto.userId = SecurityUtils.getAuthenticatedUserId()
+Ctrl -> OrderSvc : placeOrder(dto)
+activate OrderSvc
+
+== 1. Xác thực người dùng & giỏ hàng ==
+
+OrderSvc -> UserRepo : findById(dto.userId)
+UserRepo --> OrderSvc : User
+
+OrderSvc -> CartRepo : findAllById(dto.cartItemIds)
+CartRepo --> OrderSvc : List<CartItem>
+
+alt giỏ hàng rỗng hoặc thiếu item (size không khớp)
+  OrderSvc --> Ctrl : throw BadRequestException\n("Giỏ hàng rỗng hoặc các mục đã bị xóa!")
+  Ctrl --> Customer : 400 Bad Request
+end
+
+loop mỗi CartItem
+  alt CartItem.user.id != User.id
+    OrderSvc --> Ctrl : throw BadRequestException\n("Bạn không có quyền thanh toán...")
+    Ctrl --> Customer : 400 Bad Request
+  end
+end
+
+== 2. Tính tiền & xác thực tồn kho ==
+
+loop mỗi CartItem
+  OrderSvc -> OrderSvc : totalAmount += variant.price * item.quantity
+  alt variant.stockQuantity < item.quantity
+    OrderSvc --> Ctrl : throw BadRequestException\n("... không đủ số lượng tồn kho!")
+    Ctrl --> Customer : 400 Bad Request
+  end
+end
+
+== 3. Áp dụng coupon (nếu có) ==
+
+opt dto.couponCode != null
+  OrderSvc -> CouponRepo : findByCodeAndActiveTrue(code)
+  alt coupon không tồn tại / bị khóa
+    OrderSvc --> Ctrl : throw BadRequestException
+    Ctrl --> Customer : 400 Bad Request
+  end
+  alt coupon hết hạn (expiryDate < now) hoặc chưa tới ngày bắt đầu
+    OrderSvc --> Ctrl : throw BadRequestException\n("Mã giảm giá không hợp lệ hoặc đã hết hạn!")
+    Ctrl --> Customer : 400 Bad Request
+  end
+  alt totalAmount < coupon.minOrderAmount
+    OrderSvc --> Ctrl : throw BadRequestException
+    Ctrl --> Customer : 400 Bad Request
+  end
+  OrderSvc -> OrderSvc : trừ theo DiscountType\n(PERCENTAGE hoặc FIXED), clamp >= 0
+  OrderSvc -> CouponRepo : findByUserIdAndCouponCode(userId, code)
+  CouponRepo --> OrderSvc : Optional<UserCoupon>
+  alt userCoupon.isUsed() == true
+    OrderSvc --> Ctrl : throw BadRequestException\n("Mã giảm giá này đã được sử dụng!")
+    Ctrl --> Customer : 400 Bad Request
+  end
+  note right of OrderSvc : appliedCoupon = coupon
+end
+
+== 4. Khởi tạo Order (rẽ nhánh theo paymentMethod) ==
+
+OrderSvc -> OrderSvc : **initialStatus = PENDING_CONFIRMATION**\n(vì paymentMethod == COD)
+note right of OrderSvc #EEF2F7
+  So sánh với luồng VNPay:
+  paymentMethod == VNPAY ⇒ initialStatus = PENDING_PAYMENT
+  (xem sequence "Đặt hàng + Thanh toán VNPay — Phần A")
+end note
+
+OrderSvc -> OrderSvc : new Order(orderDate, totalAmount,\nshippingAddress, paymentMethod=COD,\ntype=ONLINE, user, coupon, status=PENDING_CONFIRMATION)
+OrderSvc -> OrderRepo : save(order)
+OrderRepo --> OrderSvc : order (có id)
+
+== 5. Tạo OrderItem + trừ tồn kho ==
+
+loop mỗi CartItem
+  OrderSvc -> OrderSvc : build OrderItem(productVariant, quantity,\nprice, productName, order, status=PENDING_CONFIRMATION)
+  OrderSvc -> OrderRepo : orderItemRepository.save(orderItem)
+  OrderSvc -> VariantRepo : variant.stockQuantity -= item.quantity; save(variant)
+  opt tất cả variant của Product hết hàng (stockQuantity <= 0)
+    OrderSvc -> OrderSvc : parentProduct.status = OUT_OF_STOCK
+  end
+end
+
+OrderSvc -> CartRepo : deleteAll(cartItems)
+
+== 6. Thanh toán trực tuyến — KHÔNG áp dụng cho COD ==
+
+note over OrderSvc #EAF3EA
+  paymentMethod == COD ⇒ **KHÔNG gọi VNPayService**
+  paymentUrl = null
+end note
+
+== 7. Hoàn tất ==
+
+opt appliedCoupon != null
+  OrderSvc -> CouponRepo : userCoupon.setUsed(true); save(userCoupon)
+end
+
+OrderSvc -> NotiSvc : createNotification(userId,\n"Đặt hàng thành công", "SUCCESS", orderId)
+
+OrderSvc --> Ctrl : PlaceOrderResponseDTO{\n  orderId, totalAmount,\n  status=PENDING_CONFIRMATION,\n  paymentUrl=null,\n  message="Đặt hàng thành công! Đơn hàng của bạn đang chờ xác nhận."\n}
+deactivate OrderSvc
+
+Ctrl --> Customer : 201 Created
+deactivate Ctrl
+
+note over Customer, NotiSvc #F2F2F2
+  Từ đây, đơn COD chờ **Admin xác nhận** thủ công qua
+  AdminOrderController → OrderManagementServiceImpl.updateOrderItemStatus()
+  (state machine PENDING_CONFIRMATION → CONFIRMED → PROCESSING → SHIPPING → DELIVERED → COMPLETED)
+  — nằm ngoài phạm vi sequence diagram này.
+end note
+
+@enduml

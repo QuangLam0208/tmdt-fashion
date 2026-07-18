@@ -1,0 +1,98 @@
+@startuml ArchitectureDiagram_TMDT_Fashion
+
+top to bottom direction
+skinparam linetype ortho
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam componentStyle rectangle
+
+skinparam component {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+  ArrowColor #333333
+  FontSize 11
+  FontColor #222222
+}
+skinparam package {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+  FontStyle bold
+  FontSize 13
+  FontColor #222222
+}
+skinparam rectangle {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+  FontStyle bold
+  FontSize 14
+  FontColor #222222
+}
+skinparam database {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+  FontColor #222222
+}
+skinparam cloud {
+  BackgroundColor #FFFFFF
+  BorderColor #333333
+  FontColor #222222
+}
+skinparam nodesep 18
+skinparam ranksep 36
+
+rectangle "CLIENT TIER" as ClientTier {
+  component "ReactJS SPA\n(ui_admin: admin/, customer/, shared/)" as Client
+}
+
+rectangle "BACKEND TIER (Spring Boot - app)" as BackendTier {
+
+  package "Security Layer (security)" as SecurityLayer {
+    component "SecurityConfig\nJwtAuthenticationFilter\nJwtTokenProvider\nCustomUserDetailsService\nJwtAuthenticationEntryPoint\nencoder.* (MyPasswordEncoder,\nMyBCryptImpl, MySha256Impl)\nxss.* (XssFilter, XssRequestWrapper)\nRateLimitInterceptor" as SecurityClasses
+  }
+
+  package "Presentation Layer (controller.api / controller.api.admin)" as ControllerLayer {
+    component "AuthController\nUserController\nAddressController\nProductController\nCategoryController\nCartController\nCouponController\nOrderController\nPaymentController\nReviewController\nWishlistController\nReturnRequestController\nNotificationController\nUploadController" as CustomerControllers
+
+    component "AdminCategoryController\nAdminCouponController\nAdminUserController\nAdminOrderController\nAdminProductController\nAdminReturnRequestController\nAdminDashboardController\nAdminRevenueController\nOfflineSaleController" as AdminControllers
+  }
+
+  package "Business Logic Layer (service.* + service.*Impl)" as ServiceLayer {
+    component "auth | user | address | product\ncategory | cart_item | coupon | order\npayment | review | wishlist | notification\nreturn_request | offline_sale | revenue\ndashboard | email_log | storage\n(mỗi module: Interface + Impl)" as ServiceModules
+  }
+
+  package "Data Access Layer (repository, extends JpaRepository)" as RepoLayer {
+    component "UserRepository | OrderRepository\nOrderItemRepository | OrderHistoryRepository\nProductRepository | ProductVariantRepository\nProductImageRepository | CategoryRepository\nCartItemRepository | CouponRepository\nUserCouponRepository | ReviewRepository\nReviewImageRepository | WishlistItemRepository\nReturnRequestRepository | AddressRepository\nNotificationRepository | PaymentTransactionRepository\nTokenRepository | RefreshTokenRepository\nPasswordResetTokenRepository | OtpRepository\nEmailLogRepository | RecentlyViewedItemRepository" as RepoClasses
+  }
+
+  package "Domain / Entity Layer (model, model.enums)" as ModelLayer {
+    component "User | Order | OrderItem | OrderHistory\nProduct | ProductVariant | ProductImage\nCategory | CartItem | Coupon | UserCoupon\nReview | ReviewImage | WishlistItem\nReturnRequest | Address | Notification\nPaymentTransaction | Token | RefreshToken\nPasswordResetToken | Otp | EmailLog\nRecentlyViewedItem" as ModelClasses
+  }
+
+  package "External Integration Config (config)" as ConfigLayer {
+    component "VNPayConfig\nCloudinaryConfig\nWebMvcConfig" as ConfigClasses
+  }
+
+  SecurityLayer -down-> ControllerLayer
+  ControllerLayer -down-> ServiceLayer
+  ServiceLayer -down-> RepoLayer
+  RepoLayer -down-> ModelLayer
+  ServiceLayer -down-> ConfigLayer
+}
+
+rectangle "DATABASE TIER" as DBTier {
+  database "MySQL (fashion_db)" as DB
+}
+
+rectangle "EXTERNAL SERVICES" as ExtTier {
+  component "VNPay Payment Gateway" as VNPay
+  component "Cloudinary" as Cloudinary
+  component "SMTP Gmail" as Smtp
+}
+
+Client -down-> SecurityLayer
+RepoLayer -down-> DB
+ConfigLayer -down-> VNPay
+ConfigLayer -down-> Cloudinary
+ServiceLayer -down-> Smtp
+
+@enduml

@@ -1,0 +1,139 @@
+@startuml SequenceDiagram_Payment_Reconciliation_A_Overview
+
+title Sequence Diagram — Đối soát & Hết hạn thanh toán VNPay\nPhần A: Vòng lặp OrderExpirationTask (@Scheduled, chạy mỗi 60s)
+
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 200
+skinparam roundcorner 6
+skinparam ArrowThickness 1.2
+hide footbox
+
+skinparam sequence {
+  ArrowColor #A3503F
+  ArrowFontColor #333333
+  ArrowFontSize 12
+  ActorBackgroundColor #F5EEEB
+  ActorBorderColor #A3503F
+  ActorFontStyle bold
+  ParticipantBackgroundColor #F5EEEB
+  ParticipantBorderColor #A3503F
+  ParticipantFontStyle bold
+  LifeLineBackgroundColor #F5EEEB
+  LifeLineBorderColor #DDB3A8
+  DatabaseBackgroundColor #F7F7F7
+  DatabaseBorderColor #757575
+  DatabaseFontStyle bold
+  GroupBackgroundColor #F5EEEB
+  GroupBodyBackgroundColor transparent
+  GroupBorderColor #A3503F
+  GroupFontColor #333333
+  GroupHeaderFontColor #7A3A2D
+  DividerBackgroundColor #F5EEEB
+  DividerBorderColor #A3503F
+  DividerFontColor #7A3A2D
+  DividerFontStyle bold
+  ReferenceBackgroundColor #F5EEEB
+  ReferenceBorderColor #A3503F
+  ReferenceHeaderBackgroundColor #F5EEEB
+  NoteBackgroundColor #FFF8E1
+  NoteBorderColor #757575
+  NoteFontColor #333333
+  NoteFontSize 12
+}
+
+legend top left
+|<back:#FFF6E0>    </back>| Cần lưu ý — trường hợp đặc biệt |
+|<back:#EEF2F7>    </back>| Tham chiếu chéo sang sequence khác |
+|<back:#F2F2F2>    </back>| Ngoài phạm vi của sequence này |
+endlegend
+
+autonumber "<b>[0]"
+
+participant "Spring Scheduler\n@Scheduled(fixedRate=60000)" as Trigger
+participant "OrderExpirationTask" as ExpireTask
+database "OrderRepository" as OrderRepo
+participant "PaymentServiceImpl" as PaySvc
+participant "OrderServiceImpl" as OrderSvc
+database "ProductVariantRepository" as VariantRepo
+database "UserCouponRepository" as CouponRepo
+
+Trigger -> ExpireTask : cleanupExpiredOrders()
+activate ExpireTask
+
+ExpireTask -> OrderRepo : findByStatusAndOrderDateBefore(\n  PENDING_PAYMENT, now - 10 phút)
+OrderRepo --> ExpireTask : List<Order> expiredOrders
+
+note over ExpireTask #F2F2F2
+  Chỉ đơn **VNPAY** (hoặc BANK_TRANSFER nếu có tích hợp sau này) mới rơi vào đây —
+  đơn COD khởi tạo ở PENDING_CONFIRMATION nên không bao giờ khớp điều kiện này.
+end note
+
+loop mỗi order trong expiredOrders
+
+  alt order.paymentMethod == VNPAY
+    == Đối soát chủ động trước khi huỷ (tránh huỷ nhầm đơn đã thanh toán) ==
+
+    ExpireTask -> PaySvc : reconcilePendingVNPayPayment(order.id)
+    activate PaySvc
+
+    ref over PaySvc #EEF2F7
+      Chi tiết đầy đủ (query VNPay querydr, applyGatewayResult, khôi phục đơn)
+      ở sequence "Đối soát & Hết hạn — Phần B: reconcilePendingVNPayPayment() chi tiết"
+    end ref
+
+    PaySvc --> ExpireTask : return reconciledAsPaid (true/false)
+    deactivate PaySvc
+
+    alt reconciledAsPaid == true
+      ExpireTask -> ExpireTask : log.warn("Đơn #{} thực ra ĐÃ thanh toán —\nbỏ qua việc huỷ")
+      ExpireTask -> ExpireTask : **continue** (bỏ qua đơn này, sang đơn tiếp theo)
+    else reconciledAsPaid == false
+      ExpireTask -> ExpireTask : (rơi xuống nhánh huỷ đơn bên dưới)
+    end
+  end
+
+  == Huỷ đơn quá hạn (chỉ chạy nếu KHÔNG reconciledAsPaid) ==
+
+  ExpireTask -> ExpireTask : log.info("Huỷ đơn hàng #{} do quá hạn thanh toán 10 phút")
+  ExpireTask -> ExpireTask : order.status = PAYMENT_EXPIRED
+  loop mỗi OrderItem
+    ExpireTask -> ExpireTask : item.status = PAYMENT_EXPIRED
+  end
+
+  ExpireTask -> OrderSvc : revertInventory(order.id)
+  activate OrderSvc
+  OrderSvc -> OrderRepo : findById(orderId)
+  loop mỗi OrderItem
+    OrderSvc -> VariantRepo : variant.stockQuantity += item.quantity\nsave(variant)
+  end
+  deactivate OrderSvc
+
+  opt order.coupon != null
+    ExpireTask -> CouponRepo : findByUserIdAndCouponCode(userId, couponCode)
+    ExpireTask -> CouponRepo : userCoupon.setUsed(false); save(userCoupon)
+    ExpireTask -> ExpireTask : log.info("Đã hoàn lại Coupon cho user")
+  end
+
+  ExpireTask -> OrderRepo : save(order)
+
+end
+
+deactivate ExpireTask
+
+note over Trigger, CouponRepo #FFF6E0
+  **Nhánh "hết hàng khi khôi phục"** (xảy ra bên trong applyGatewayResult() →
+  handleLatePaymentAfterExpiry(), khi return/IPN đến muộn *sau khi* order đã chuyển
+  sang PAYMENT_EXPIRED/CANCELLED — tức là sau vòng lặp huỷ ở trên, không phải
+  trong luồng reconcile chủ động của Phần A/B ở đây):
+  - còn tồn kho ⇒ trừ kho lại, Order/OrderItem → PAID, notify admin mức WARNING
+  - hết tồn kho ⇒ **không** đánh dấu PAID, set RefundStatus.PENDING (hoàn tiền thủ công),
+    notify admin mức ERROR ("Cần hoàn tiền khẩn cấp")
+  Xem chi tiết đầy đủ ở sequence "Đặt hàng + Thanh toán VNPay — Phần B", nhánh late-recovery.
+end note
+
+@enduml
