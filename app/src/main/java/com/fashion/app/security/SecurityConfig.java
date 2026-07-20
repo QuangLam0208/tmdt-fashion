@@ -75,6 +75,13 @@ public class SecurityConfig {
 
                         .requestMatchers("/error").permitAll()
 
+                        // Swagger / OpenAPI docs — công khai để xem đặc tả API
+                        .requestMatchers(
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html"
+                        ).permitAll()
+
                         // Xem sản phẩm, danh mục — ai cũng xem được
                         .requestMatchers(HttpMethod.GET, "/api/products/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/categories/**").permitAll()
