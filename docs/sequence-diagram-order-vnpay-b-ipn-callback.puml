@@ -1,0 +1,177 @@
+@startuml SequenceDiagram_Order_VNPay_B_IPN
+
+title Sequence Diagram — Đặt hàng + Thanh toán VNPay\nPhần B: VNPay IPN Callback & Idempotency (bất đồng bộ, KHÔNG cùng transaction với Phần A)
+
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam defaultFontSize 12
+skinparam titleFontSize 15
+skinparam titleFontStyle bold
+skinparam sequenceMessageAlign center
+skinparam maxMessageSize 200
+skinparam roundcorner 6
+skinparam ArrowThickness 1.2
+hide footbox
+
+skinparam sequence {
+  ArrowColor #0B5AA6
+  ArrowFontColor #333333
+  ArrowFontSize 12
+  ActorBackgroundColor #EAF1F8
+  ActorBorderColor #0B5AA6
+  ActorFontStyle bold
+  ParticipantBackgroundColor #EAF1F8
+  ParticipantBorderColor #0B5AA6
+  ParticipantFontStyle bold
+  LifeLineBackgroundColor #EAF1F8
+  LifeLineBorderColor #A8C6E3
+  DatabaseBackgroundColor #F7F7F7
+  DatabaseBorderColor #757575
+  DatabaseFontStyle bold
+  GroupBackgroundColor #EAF1F8
+  GroupBodyBackgroundColor transparent
+  GroupBorderColor #0B5AA6
+  GroupFontColor #333333
+  GroupHeaderFontColor #08417A
+  DividerBackgroundColor #EAF1F8
+  DividerBorderColor #0B5AA6
+  DividerFontColor #08417A
+  DividerFontStyle bold
+  ReferenceBackgroundColor #EAF1F8
+  ReferenceBorderColor #0B5AA6
+  ReferenceHeaderBackgroundColor #EAF1F8
+  NoteBackgroundColor #FFF8E1
+  NoteBorderColor #757575
+  NoteFontColor #333333
+  NoteFontSize 12
+}
+
+legend top left
+|<back:#EAF3EA>    </back>| An toàn, idempotent — không cần xử lý thêm |
+|<back:#FBEAEA>    </back>| Rollback / huỷ giao dịch — cảnh báo nghiêm trọng |
+|<back:#FFF6E0>    </back>| Cần lưu ý — race condition / trường hợp đặc biệt |
+|<back:#EEF2F7>    </back>| Tham chiếu chéo sang sequence khác |
+endlegend
+
+autonumber "<b>[0]"
+
+actor "VNPay Gateway\n(server-to-server)" as VNPayIPN
+participant "PaymentController" as PayCtrl
+participant "PaymentServiceImpl" as PaySvc
+participant "VNPayService" as VNPaySvc
+database "PaymentTransactionRepository" as TxRepo
+database "OrderRepository /\nOrderItemRepository /\nOrderHistoryRepository" as OrderRepo
+participant "OrderManagementServiceImpl" as OrderMgmtSvc
+
+ref over PayCtrl #EEF2F7
+  Trước đó: khách đã đặt đơn (status=PENDING_PAYMENT) và được redirect
+  sang trang thanh toán VNPay (xem sequence "Đặt hàng VNPay — Phần A: Khởi tạo đơn")
+end ref
+
+note over VNPayIPN, PayCtrl #F2F2F2
+  URL này **không** được truyền tự động lúc tạo giao dịch (khác MoMo) —
+  phải khai báo thủ công trong VNPay Merchant Admin (Sandbox).
+end note
+
+VNPayIPN -> PayCtrl : POST /api/payments/vnpay/ipn\n{vnp_TmnCode, vnp_TxnRef, vnp_Amount,\nvnp_ResponseCode, vnp_TransactionNo,\nvnp_TransactionStatus, vnp_SecureHash, ...}
+activate PayCtrl
+PayCtrl -> PaySvc : processVNPayIPN(payload)
+activate PaySvc
+
+PaySvc -> VNPaySvc : verifySignature(stringParams)
+activate VNPaySvc
+VNPaySvc -> VNPaySvc : sortedParams = TreeMap(allParams)\n(loại bỏ vnp_SecureHash, vnp_SecureHashType)
+VNPaySvc -> VNPaySvc : hashData = nối "key=" + URLEncoder.encode(value)\ncủa từng param (thứ tự alphabet) bằng "&"
+VNPaySvc -> VNPaySvc : recalculatedHash = hmacSha512(hashData, hashSecret)
+VNPaySvc --> PaySvc : recalculatedHash.equalsIgnoreCase(vnp_SecureHash)
+deactivate VNPaySvc
+
+alt chữ ký KHÔNG hợp lệ
+  PaySvc --> PayCtrl : throw RuntimeException("Chữ ký VNPay không hợp lệ!")
+  PayCtrl --> VNPayIPN : 400 Bad Request
+else chữ ký hợp lệ
+  PaySvc -> PaySvc : orderId = Long.parseLong(\n  vnp_TxnRef.split("_")[0])\ntransId = vnp_TransactionNo\nrequestId = vnp_TxnRef
+
+  note right of PaySvc #F2F2F2
+    vnp_TxnRef có định dạng "{orderId}_{timestamp}"
+    (sinh ra lúc createPaymentUrl) — tách orderId bằng split("_")[0].
+  end note
+
+  PaySvc -> PaySvc : **applyGatewayResult**(orderId, transId, requestId,\nsuccess = "00".equals(vnp_ResponseCode), rawPayload)
+
+  == applyGatewayResult() — chốt chặn idempotency (logic giống hệt mọi cổng thanh toán) ==
+
+  PaySvc -> TxRepo : existsByProviderAndTransId(VNPAY, transId)
+  alt transId đã tồn tại (VNPay gọi lại IPN cho giao dịch đã xử lý — retry chuẩn của VNPay)
+    TxRepo --> PaySvc : true
+    PaySvc -> PaySvc : log.info("Bỏ qua — idempotent no-op")
+    note right of PaySvc #EAF3EA
+      **Không** update Order/OrderItem lần 2,
+      không gửi lại notification/email trùng.
+    end note
+  else transId chưa từng xử lý
+    TxRepo --> PaySvc : false
+    PaySvc -> TxRepo : findByProviderAndRequestId(VNPAY, requestId)
+    alt tìm thấy (trường hợp bình thường)
+      TxRepo --> PaySvc : Optional<PaymentTransaction>\n(bản ghi PENDING tạo lúc createPaymentUrl,\nrequestId = vnp_TxnRef)
+    else không tìm thấy (hiếm — requestId không khớp bản ghi PENDING nào)
+      TxRepo --> PaySvc : Optional.empty()
+      PaySvc -> OrderRepo : findById(orderId)
+      OrderRepo --> PaySvc : Order
+      PaySvc -> PaySvc : tx = new PaymentTransaction(order, provider=VNPAY,\nrequestId, amount=order.totalAmount, createdAt=now)
+    end
+    PaySvc -> PaySvc : tx.transId = transId\ntx.status = SUCCESS / FAILED\ntx.rawResponsePayload = "IPN: " + payload\ntx.processedAt = now
+
+    PaySvc -> TxRepo : saveAndFlush(tx)
+    alt DataIntegrityViolationException\n(unique (provider,trans_id) đụng — 2 IPN gần như đồng thời)
+      TxRepo --> PaySvc : throw DataIntegrityViolationException
+      PaySvc -> PaySvc : log.warn("Phát hiện xử lý trùng — race condition, bỏ qua")
+      note right of PaySvc #FFF6E0
+        Request thua trong race **dừng lại tại đây**,
+        không update Order — request thắng đã làm việc đó rồi.
+      end note
+    else lưu thành công
+      PaySvc -> PaySvc : **updateOrderPayStatus**(orderId, success)
+
+      == updateOrderPayStatus() ==
+      PaySvc -> OrderRepo : findById(orderId)
+      OrderRepo --> PaySvc : Order
+
+      alt success == true && order.status ∈ {PAYMENT_EXPIRED, CANCELLED}
+        note right of PaySvc #FBEAEA
+          **Case "tiền đã trừ nhưng mất kết nối"**:
+          đơn đã bị OrderExpirationTask tự huỷ trước khi IPN này đến.
+          ⇒ gọi handleLatePaymentAfterExpiry(order)
+          (chi tiết đầy đủ ở sequence "Payment Reconciliation")
+        end note
+        PaySvc -> PaySvc : handleLatePaymentAfterExpiry(order)
+      else luồng bình thường (order.status == PENDING_PAYMENT)
+        loop mỗi OrderItem có status PENDING_PAYMENT hoặc PAYMENT_FAILED
+          PaySvc -> OrderRepo : item.status = success ? PAID : PAYMENT_FAILED\norderItemRepository.save(item)
+          opt success == true
+            PaySvc -> OrderRepo : orderHistoryRepository.save(\n  OrderHistory{orderItem, previousStatus, newStatus=PAID, changeDate})
+          end
+        end
+        PaySvc -> OrderMgmtSvc : updateOverallOrderStatus(order)
+        activate OrderMgmtSvc
+        OrderMgmtSvc -> OrderMgmtSvc : tính "dominant status" theo priority\n(PAYMENT_FAILED > PAYMENT_EXPIRED > CANCELLED >\nPENDING_CONFIRMATION > PENDING_PAYMENT > PAID > ...)
+        opt order.status thay đổi
+          OrderMgmtSvc -> OrderRepo : save(order)
+        end
+        deactivate OrderMgmtSvc
+      end
+    end
+  end
+end
+PaySvc --> PayCtrl : (void — không exception)
+deactivate PaySvc
+PayCtrl --> VNPayIPN : 200 "success"
+deactivate PayCtrl
+
+note over PayCtrl #EEF2F7
+  IPN (server-to-server) thường đến **TRƯỚC** Return (đợi trình duyệt redirect).
+  Cả hai đường đều đi qua applyGatewayResult() nên tự động idempotent với nhau
+  — xem sequence "Đặt hàng VNPay — Phần C: Return URL".
+end note
+
+@enduml

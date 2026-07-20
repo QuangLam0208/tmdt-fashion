@@ -1,0 +1,78 @@
+@startuml UseCaseDiagram_Admin
+
+left to right direction
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+skinparam linetype polyline
+skinparam shadowing false
+skinparam usecase {
+  BackgroundColor #FFF7E8
+  BorderColor #D9944A
+  ArrowColor #D9944A
+  FontSize 13
+}
+skinparam package {
+  BackgroundColor #FDFDFD
+  BorderColor #999999
+  FontStyle bold
+}
+skinparam nodesep 25
+skinparam ranksep 45
+
+actor "Quản trị viên\n(Admin)" as Admin
+
+rectangle "HỆ THỐNG BÁN HÀNG THỜI TRANG - PHÍA QUẢN TRỊ" {
+
+  package "Quản lý sản phẩm" {
+    usecase "Quản lý sản phẩm\n(thêm/sửa/xóa)" as UC_Product
+    usecase "Quản lý danh mục\n(thêm/sửa/xóa)" as UC_Category
+    usecase "Tải ảnh sản phẩm" as UC_Upload
+  }
+
+  package "Quản lý đơn hàng" {
+    usecase "Xem & quản lý\ntất cả đơn hàng" as UC_Orders
+    usecase "Cập nhật trạng thái\nđơn hàng / hoàn tiền" as UC_UpdateOrder
+    usecase "Xuất hóa đơn PDF" as UC_Invoice
+    usecase "Ghi nhận bán hàng\ntrực tiếp (tại cửa hàng)" as UC_OfflineSale
+  }
+
+  package "Quản lý khách hàng" {
+    usecase "Xem danh sách\n& chi tiết khách hàng" as UC_Customers
+    usecase "Cập nhật trạng thái\ntài khoản khách hàng" as UC_UpdateCustomer
+  }
+
+  package "Quản lý khuyến mãi" {
+    usecase "Quản lý mã giảm giá\n(thêm/sửa/bật-tắt)" as UC_Coupon
+  }
+
+  package "Quản lý trả hàng" {
+    usecase "Xem & xử lý yêu cầu\ntrả hàng / hoàn tiền" as UC_ReturnRequest
+  }
+
+  package "Báo cáo & Thống kê" {
+    usecase "Xem bảng điều khiển\nthống kê tổng quan" as UC_Dashboard
+    usecase "Xem & xuất báo cáo\ndoanh thu" as UC_Revenue
+  }
+}
+
+Admin --> UC_Product
+Admin --> UC_Category
+UC_Product ..> UC_Upload : <<include>>
+
+Admin --> UC_Orders
+Admin --> UC_UpdateOrder
+Admin --> UC_Invoice
+Admin --> UC_OfflineSale
+
+Admin --> UC_Customers
+Admin --> UC_UpdateCustomer
+
+Admin --> UC_Coupon
+
+Admin --> UC_ReturnRequest
+UC_ReturnRequest ..> UC_UpdateOrder : <<extend>>
+
+Admin --> UC_Dashboard
+Admin --> UC_Revenue
+
+@enduml

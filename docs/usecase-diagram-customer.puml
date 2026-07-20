@@ -1,0 +1,92 @@
+@startuml UseCaseDiagram_Customer
+
+left to right direction
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+skinparam linetype polyline
+skinparam shadowing false
+skinparam usecase {
+  BackgroundColor #F5FAFF
+  BorderColor #4A90D9
+  ArrowColor #4A90D9
+  FontSize 13
+}
+skinparam package {
+  BackgroundColor #FDFDFD
+  BorderColor #999999
+  FontStyle bold
+}
+skinparam nodesep 25
+skinparam ranksep 45
+
+' ===== Actor bên trái =====
+actor "Khách hàng\n(Customer)" as Customer
+
+rectangle "HỆ THỐNG BÁN HÀNG THỜI TRANG - PHÍA KHÁCH HÀNG" {
+
+  package "Tài khoản" {
+    usecase "Đăng ký & xác thực\ntài khoản" as UC_Register
+    usecase "Đăng nhập / Đăng xuất" as UC_Login
+    usecase "Khôi phục mật khẩu" as UC_Recover
+    usecase "Quản lý hồ sơ\n& sổ địa chỉ" as UC_Profile
+  }
+
+  package "Mua sắm" {
+    usecase "Tìm kiếm & xem\nsản phẩm" as UC_Browse
+    usecase "Xem gợi ý sản phẩm\ndành cho bạn" as UC_Recommend
+    usecase "Xem đánh giá\nsản phẩm" as UC_ViewReview
+    usecase "Viết đánh giá\nsản phẩm" as UC_SubmitReview
+    usecase "Quản lý danh sách\nyêu thích" as UC_Wishlist
+  }
+
+  package "Giỏ hàng & Thanh toán" {
+    usecase "Quản lý giỏ hàng" as UC_Cart
+    usecase "Áp dụng mã\ngiảm giá" as UC_Coupon
+    usecase "Đặt hàng" as UC_PlaceOrder
+    usecase "Thanh toán\n(qua VNPay)" as UC_Payment
+  }
+
+  package "Đơn hàng của tôi" {
+    usecase "Theo dõi đơn hàng\n(danh sách/chi tiết/lịch sử)" as UC_TrackOrder
+    usecase "Xem tổng quan\nđơn hàng của tôi" as UC_OrderDashboard
+    usecase "Hủy đơn hàng" as UC_CancelOrder
+    usecase "Yêu cầu trả hàng\n/ hoàn tiền" as UC_Return
+    usecase "Xem thông báo" as UC_Notification
+  }
+}
+
+' ===== Actor bên phải: hệ thống ngoài / tự động =====
+actor "VNPay Payment\nGateway" as VNPay
+actor "Hệ thống\n(Scheduler)" as Scheduler
+
+Customer --> UC_Register
+Customer --> UC_Login
+Customer --> UC_Recover
+Customer --> UC_Profile
+
+Customer --> UC_Browse
+Customer --> UC_Recommend
+Customer --> UC_ViewReview
+Customer --> UC_SubmitReview
+Customer --> UC_Wishlist
+
+Customer --> UC_Cart
+Customer --> UC_Coupon
+Customer --> UC_PlaceOrder
+Customer --> UC_Payment
+
+Customer --> UC_TrackOrder
+Customer --> UC_OrderDashboard
+Customer --> UC_CancelOrder
+Customer --> UC_Return
+Customer --> UC_Notification
+
+UC_Browse ..> UC_ViewReview : <<extend>>
+UC_PlaceOrder ..> UC_Coupon : <<extend>>
+UC_PlaceOrder ..> UC_Payment : <<include>>
+
+' ===== Actor bên phải (mũi tên đảo chiều để giữ vị trí bên phải) =====
+UC_Payment --> VNPay : xử lý IPN /\nkết quả thanh toán
+UC_CancelOrder --> Scheduler : tự động hủy\nđơn quá hạn
+
+@enduml
