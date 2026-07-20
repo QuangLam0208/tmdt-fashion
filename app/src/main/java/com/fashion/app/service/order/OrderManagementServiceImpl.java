@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
  import com.lowagie.text.*;
  import com.lowagie.text.pdf.*;
+ import org.springframework.core.io.ClassPathResource;
  import java.io.ByteArrayOutputStream;
  import java.text.NumberFormat;
  import java.text.SimpleDateFormat;
@@ -138,11 +139,16 @@ public class OrderManagementServiceImpl implements OrderManagementService {
             PdfWriter.getInstance(document, out);
             document.open();
 
-            // Font mặc định (Lưu ý: Để hiển thị tiếng Việt có dấu chuẩn 100%, bạn nên load file .ttf,
-            // ở đây ta dùng font tiêu chuẩn tích hợp sẵn)
-            Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18);
-            Font headerFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12);
-            Font normalFont = FontFactory.getFont(FontFactory.HELVETICA, 12);
+            // Font Unicode nhúng trực tiếp (Helvetica chuẩn của PDF không có glyph tiếng Việt có dấu
+            // nên phải nạp font .ttf và encode bằng IDENTITY_H mới hiển thị đúng)
+            byte[] regularBytes = new ClassPathResource("fonts/arial.ttf").getInputStream().readAllBytes();
+            byte[] boldBytes = new ClassPathResource("fonts/arialbd.ttf").getInputStream().readAllBytes();
+            BaseFont baseFontRegular = BaseFont.createFont("arial.ttf", BaseFont.IDENTITY_H, BaseFont.EMBEDDED, BaseFont.CACHED, regularBytes, null);
+            BaseFont baseFontBold = BaseFont.createFont("arialbd.ttf", BaseFont.IDENTITY_H, BaseFont.EMBEDDED, BaseFont.CACHED, boldBytes, null);
+
+            Font titleFont = new Font(baseFontBold, 18, Font.BOLD);
+            Font headerFont = new Font(baseFontBold, 12, Font.BOLD);
+            Font normalFont = new Font(baseFontRegular, 12, Font.NORMAL);
 
             // 4. AC-US47-04: Header & Tên cửa hàng
             Paragraph title = new Paragraph("FASHION SHOP - INVOICE", titleFont);
