@@ -55,18 +55,6 @@ const AppHeader = () => {
 
       {/* Right — notification + user */}
       <Space size={16}>
-        {/* Notification bell */}
-        <Badge count={3} size="small">
-          <BellOutlined
-            style={{
-              fontSize: 18,
-              color:    '#64748b',
-              cursor:   'pointer',
-              padding:  4,
-            }}
-          />
-        </Badge>
-
         {/* User dropdown */}
         <Dropdown
           menu={{ items: userMenuItems, onClick: handleMenuClick }}
