@@ -75,10 +75,22 @@ public class SecurityConfig {
 
                         .requestMatchers("/error").permitAll()
 
+                        // Swagger / OpenAPI docs — công khai để xem đặc tả API
+                        .requestMatchers(
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html"
+                        ).permitAll()
+
                         // Xem sản phẩm, danh mục — ai cũng xem được
                         .requestMatchers(HttpMethod.GET, "/api/products/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/categories/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/reviews/**").permitAll()
+                        // Chỉ mở callback của VNPay
+                        .requestMatchers(
+                                "/api/payments/vnpay/ipn",
+                                "/api/payments/vnpay/return"
+                        ).permitAll()
 
                         // === ADMIN ENDPOINTS ===
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
@@ -143,7 +155,8 @@ public class SecurityConfig {
                 "http://localhost:3000",  // ReactJS dev server
                 "http://localhost:5173",   // Vite dev server
                 "https://tmdt-fashion-ssl8-nine.vercel.app",
-                "https://tmdt-fashion.onrender.com"
+                "https://tmdt-fashion.onrender.com",
+                "https://tmdt-fashion.vercel.app"
         ));
 
         // Cho phép tất cả HTTP methods

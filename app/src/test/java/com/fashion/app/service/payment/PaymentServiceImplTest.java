@@ -94,7 +94,7 @@ class PaymentServiceImplTest {
 
     @Test
     void processVNPayIPN_SignatureInvalid_ThrowsException() {
-        Map<String, Object> payload = new HashMap<>();
+        Map<String, String> payload = new HashMap<>();
         payload.put("vnp_TxnRef", "1_1000");
         payload.put("vnp_ResponseCode", "00");
 
@@ -108,7 +108,7 @@ class PaymentServiceImplTest {
 
     @Test
     void processVNPayIPN_SignatureValid_Success_UpdatesStatusToPaid() {
-        Map<String, Object> payload = new HashMap<>();
+        Map<String, String> payload = new HashMap<>();
         payload.put("vnp_TxnRef", "1_1000");
         payload.put("vnp_ResponseCode", "00");
         payload.put("vnp_TransactionNo", "trans-001");
@@ -129,7 +129,7 @@ class PaymentServiceImplTest {
 
     @Test
     void processVNPayIPN_SignatureValid_Failed_UpdatesStatusToPaymentFailed() {
-        Map<String, Object> payload = new HashMap<>();
+        Map<String, String> payload = new HashMap<>();
         payload.put("vnp_TxnRef", "1_1000");
         payload.put("vnp_ResponseCode", "24");
         payload.put("vnp_TransactionNo", "trans-002");
@@ -149,7 +149,7 @@ class PaymentServiceImplTest {
 
     @Test
     void processVNPayIPN_DuplicateTransId_IsIdempotent_DoesNotReprocess() {
-        Map<String, Object> payload = new HashMap<>();
+        Map<String, String> payload = new HashMap<>();
         payload.put("vnp_TxnRef", "1_1000");
         payload.put("vnp_ResponseCode", "00");
         payload.put("vnp_TransactionNo", "trans-003");
@@ -213,7 +213,7 @@ class PaymentServiceImplTest {
         mockOrderItem.setProductVariant(variant);
         mockOrder.setStatus(OrderStatus.PAYMENT_EXPIRED);
 
-        Map<String, Object> payload = new HashMap<>();
+        Map<String, String> payload = new HashMap<>();
         payload.put("vnp_TxnRef", "1_1000");
         payload.put("vnp_ResponseCode", "00");
         payload.put("vnp_TransactionNo", "trans-late-001");
@@ -244,7 +244,7 @@ class PaymentServiceImplTest {
         mockOrderItem.setProductVariant(variant);
         mockOrder.setStatus(OrderStatus.CANCELLED);
 
-        Map<String, Object> payload = new HashMap<>();
+        Map<String, String> payload = new HashMap<>();
         payload.put("vnp_TxnRef", "1_1000");
         payload.put("vnp_ResponseCode", "00");
         payload.put("vnp_TransactionNo", "trans-late-002");

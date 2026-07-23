@@ -24,8 +24,8 @@ import WishlistPage      from '../pages/shop/WishlistPage';
 import CartPage         from '../pages/checkout/CartPage';
 import CheckoutPage     from '../pages/checkout/CheckoutPage';
 import OrderConfirmPage from '../pages/checkout/OrderConfirmPage';
-import MoMoReturnPage   from '../pages/checkout/MoMoReturnPage';
-import MockMoMoPage from '../pages/checkout/MockMoMoPage';
+import VNPayReturnPage  from '../pages/checkout/VNPayReturnPage';
+import MockVNPayPage from '../pages/checkout/MockVNPayPage';
 
 // ── Account (protected)
 import ProfilePage     from '../pages/account/ProfilePage';
@@ -65,8 +65,8 @@ const CustomerRoutes = () => (
         <Route path="cart"               element={<CartPage />} />
         <Route path="checkout"           element={<CheckoutPage />} />
         <Route path="checkout/confirm"   element={<OrderConfirmPage />} />
-        <Route path="checkout/payment-result" element={<MoMoReturnPage />} /> 
-        <Route path="mock/momo-payment" element={<MockMoMoPage />} />
+        <Route path="checkout/payment-result" element={<VNPayReturnPage />} />
+        <Route path="mock/vnpay-payment" element={<MockVNPayPage />} />
         <Route path="account/profile"    element={<ProfilePage />} />
         <Route path="account/orders"     element={<CustomerOrder />} />
         <Route path="account/orders/:id" element={<OrderDetailPage />} />

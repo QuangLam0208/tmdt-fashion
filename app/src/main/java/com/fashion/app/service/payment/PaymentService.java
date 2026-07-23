@@ -10,7 +10,7 @@ public interface PaymentService {
     PaymentResponseDTO processPayment(ProcessPaymentRequestDTO dto);
 
     // Xử lý VNPay
-    void processVNPayIPN(Map<String, Object> payload);
+    public void processVNPayIPN(Map<String, String> stringParams);
     String processVNPayReturn(Map<String, String> allParams);
     PaymentResponseDTO recreateVNPayPayment(Long orderId);
 

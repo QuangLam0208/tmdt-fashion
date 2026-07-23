@@ -36,8 +36,16 @@ public class WishlistController {
         );
     }
 
-    // XÓA KHỎI DANH SÁCH
-    @DeleteMapping("remove")
+    // XÓA 1 MỤC YÊU THÍCH THEO ID
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> removeWishlistItem(@PathVariable Long id) {
+        Long userId = SecurityUtils.getAuthenticatedUserId();
+        wishlistService.removeWishlistItems(userId, List.of(id));
+        return ResponseEntity.noContent().build();
+    }
+
+    // XÓA NHIỀU MỤC YÊU THÍCH
+    @DeleteMapping("/remove")
     public ResponseEntity<Void> removeListWishlistItem(@RequestBody RemoveWishlistRequestDTO wishlists) {
         Long userId = SecurityUtils.getAuthenticatedUserId();
         wishlistService.removeWishlistItems(userId, wishlists.getWishlists());

@@ -168,13 +168,13 @@ const CustomerOrderListPage = () => {
                           Xem chi tiết
                       </Button>
                       {order.status === 'PENDING_PAYMENT' && (
-                        <Button 
-                          type="primary" 
-                          style={{ background: '#e11b8d', borderColor: '#e11b8d' }}
+                        <Button
+                          type="primary"
+                          style={{ background: '#0068ff', borderColor: '#0068ff' }}
                           onClick={async () => {
                             try {
                               message.loading('Đang khởi tạo lại phiên thanh toán...', 0);
-                              const res = await checkoutService.retryMomoPayment(orderId);
+                              const res = await checkoutService.retryVNPayPayment(orderId);
                               
                               // AC-FE-US29-02: Chuyển hướng sang link thanh toán mới
                               if (res.paymentUrl) {

@@ -91,7 +91,7 @@ const OrderDetailPage = () => {
   const handleRetryPayment = async () => {
     try {
       message.loading('Đang khởi tạo lại phiên thanh toán...', 0);
-      const res = await checkoutService.retryMomoPayment(order.id || order.orderId);
+      const res = await checkoutService.retryVNPayPayment(order.id || order.orderId);
       if (res.paymentUrl) {
         window.location.href = res.paymentUrl;
       }
@@ -254,8 +254,8 @@ const OrderDetailPage = () => {
               Yêu cầu Trả hàng / Hoàn tiền
             </Button>
           )}
-          {order.status === 'PENDING_PAYMENT' && order.paymentMethod === 'MOMO' && (
-            <Button type="primary" style={{ background: '#e11b8d', borderColor: '#e11b8d' }} onClick={handleRetryPayment}>
+          {order.status === 'PENDING_PAYMENT' && order.paymentMethod === 'VNPAY' && (
+            <Button type="primary" style={{ background: '#0068ff', borderColor: '#0068ff' }} onClick={handleRetryPayment}>
               Thanh toán ngay
             </Button>
           )}
